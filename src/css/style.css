@@ -1,0 +1,8 @@
+label.status-bar {
+    background-color: @theme_base_color;
+    padding: 5px;
+    border-width: 1px;
+    border-style: solid solid none none;
+    border-color: @borders;
+    border-radius: 0 8px 0 0;
+}

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=wv
+Comment=Web Viewer
+GenericName=Web Browser
+Exec=wv %U
+TryExec=wv
+Type=Application
+Icon=web-browser-symbolic
+Terminal=false
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+Categories=Network;WebBrowser;
