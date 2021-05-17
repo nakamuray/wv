@@ -1,7 +1,11 @@
 use gio::prelude::*;
 use gtk::prelude::*;
+use std::convert::TryInto;
 use std::env;
 
+use cairo::ImageSurface;
+use gdk::pixbuf_get_from_surface;
+use gdk_pixbuf::InterpType;
 use gio::{AppInfo, AppInfoExt};
 use glib::GString;
 use gtk::{
@@ -36,12 +40,14 @@ impl CustomTitle {
             .build();
         let favicon = Image::new();
         favicon.get_style_context().add_class("favicon");
-        title_box.pack_start(&favicon, false, false, 0);
+        favicon.set_halign(Align::End);
+        title_box.pack_start(&favicon, true, true, 0);
         let title = LabelBuilder::new()
             .wrap(false)
             .single_line_mode(true)
             .ellipsize(EllipsizeMode::End)
             .width_chars(MIN_TITLE_CHARS)
+            .halign(Align::Start)
             .build();
         title.get_style_context().add_class("title");
         title_box.pack_start(&title, true, true, 0);
@@ -247,12 +253,19 @@ fn open_window(app: &Application, url: String) {
     viewer.webview.connect_property_favicon_notify(
         glib::clone!(@weak custom_title.favicon as favicon => move |webview| {
             if let Some(surface) = webview.get_favicon() {
-                // TODO: resize surface
+                let image_surface: ImageSurface = surface.try_into().expect("image surface expected");
+                let width = image_surface.get_width();
+                let height = image_surface.get_height();
+                let mut pixbuf = pixbuf_get_from_surface(&image_surface, 0, 0, width, height).unwrap();
+
                 const FAVICON_SIZE: i32 = 16;
                 let scale = favicon.get_scale_factor();
                 let favicon_size = FAVICON_SIZE * scale;
-                let pixbuf = gdk::pixbuf_get_from_surface(&surface, 0, 0, favicon_size, favicon_size).unwrap();
+                if favicon_size != width || favicon_size != height {
+                    pixbuf = pixbuf.scale_simple(favicon_size, favicon_size, InterpType::Bilinear).unwrap();
+                }
                 favicon.set_from_pixbuf(Some(&pixbuf));
+
             } else {
                 favicon.clear();
             }
