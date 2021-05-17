@@ -12,6 +12,7 @@ use gtk::{
     Align, Application, ApplicationWindow, BoxBuilder, Button, HeaderBar, HeaderBarExt, IconSize,
     Image, Label, LabelBuilder, LabelExt, MenuButton, ModelButtonBuilder, Orientation, PopoverMenu,
 };
+use gtk_macros::action;
 use pango::EllipsizeMode;
 use webkit2gtk::{ContextMenu, ContextMenuExt, ContextMenuItem, HitTestResultExt, WebViewExt};
 
@@ -77,24 +78,6 @@ fn open_window(app: &Application, url: String) {
     win.set_default_size(960, 800);
 
     let viewer = viewer::Viewer::new();
-
-    win.connect_key_press_event(glib::clone!(@weak viewer.search_bar as search_bar => @default-return Inhibit(false), move |win, event| {
-        if event.get_state().contains(gdk::ModifierType::CONTROL_MASK) {
-            let key = event.get_keyval();
-            match key.to_unicode() {
-                Some('f') => {
-                    if !search_bar.get_search_mode() {
-                        search_bar.set_search_mode(true);
-                        return Inhibit(true);
-                    }
-                },
-                Some('w') => win.close(),
-                _ => (),
-            }
-        }
-        Inhibit(false)
-    }));
-
     win.add(&viewer.widget);
 
     let bar = HeaderBar::new();
@@ -313,6 +296,53 @@ fn open_window(app: &Application, url: String) {
             }
         }),
     );
+
+    action!(
+        win,
+        "close",
+        glib::clone!(@weak win => move |_action, _parameter| {
+            win.close();
+        })
+    );
+    app.set_accels_for_action("win.close", &["<Primary>w"]);
+
+    action!(
+        win,
+        "find",
+        glib::clone!(@weak viewer.search_bar as search_bar => move |_action, _parameter| {
+            if !search_bar.get_search_mode() {
+                search_bar.set_search_mode(true);
+            }
+        })
+    );
+    app.set_accels_for_action("win.find", &["<Primary>f"]);
+
+    action!(
+        win,
+        "back",
+        glib::clone!(@weak viewer.webview as webview => move |_action, _parameter| {
+            webview.go_back();
+        })
+    );
+    app.set_accels_for_action("win.back", &["<alt>Left"]);
+
+    action!(
+        win,
+        "forward",
+        glib::clone!(@weak viewer.webview as webview => move |_action, _parameter| {
+            webview.go_forward();
+        })
+    );
+    app.set_accels_for_action("win.forward", &["<alt>Right"]);
+
+    action!(
+        win,
+        "reload",
+        glib::clone!(@weak viewer.webview as webview => move |_action, _parameter| {
+            webview.reload();
+        })
+    );
+    app.set_accels_for_action("win.reload", &["<Primary>r"]);
 
     viewer.webview.load_uri(&url);
 

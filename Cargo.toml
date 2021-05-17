@@ -13,5 +13,6 @@ gdk-pixbuf = { version = "0.9.0", features = ["v2_40"] }
 gio = { version = "0.9", features = ["v2_64"] }
 glib = { version = "0.10", features = ["v2_64"] }
 gtk = { version = "0.9", features = ["v3_24"] }
+gtk-macros = "0.3.0"
 pango = { version = "0.9.1", features = ["v1_44"] }
 webkit2gtk = { version = "0.11", features = ["v2_28"] }
