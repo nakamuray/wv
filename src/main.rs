@@ -24,11 +24,15 @@ fn main() {
     });
     app.connect_open(|app, files, _hints| {
         for f in files {
-            window::open_window(&app, f.get_uri().to_string());
+            let win = window::Window::new(&app);
+            win.widget.show_all();
+            win.load_uri(&f.get_uri());
         }
     });
     app.connect_activate(move |app| {
-        window::open_window(&app, "about:blank".to_string());
+        let win = window::Window::new(&app);
+        win.widget.show_all();
+        win.load_uri("about:blank");
     });
     app.run(&env::args().collect::<Vec<_>>());
 }
