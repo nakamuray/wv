@@ -89,7 +89,6 @@ impl Window {
     pub fn new(app: &Application) -> Self {
         let win = ApplicationWindow::new(app);
         win.set_title("Web View");
-        win.set_default_size(960, 800);
 
         let viewer = viewer::Viewer::new();
         win.add(&viewer.widget);
