@@ -9,11 +9,15 @@ use gio::{AppInfo, AppInfoExt};
 use glib::GString;
 use gtk::{
     Align, Application, ApplicationWindow, BoxBuilder, Button, HeaderBar, HeaderBarExt, IconSize,
-    Image, Label, LabelBuilder, LabelExt, MenuButton, ModelButtonBuilder, Orientation, PopoverMenu,
+    Image, Label, LabelBuilder, LabelExt, Menu, MenuButton, MenuItem, ModelButtonBuilder,
+    Orientation, PopoverMenu,
 };
 use gtk_macros::action;
 use pango::EllipsizeMode;
-use webkit2gtk::{ContextMenu, ContextMenuExt, ContextMenuItem, HitTestResultExt, WebViewExt};
+use webkit2gtk::{
+    BackForwardListExt, BackForwardListItemExt, ContextMenu, ContextMenuExt, ContextMenuItem,
+    HitTestResultExt, WebViewExt,
+};
 
 use crate::viewer;
 
@@ -308,11 +312,52 @@ impl Window {
                 webview.go_back();
             }),
         );
+        self.back_button.connect_button_press_event(glib::clone!(
+                @weak self.viewer.webview as webview => @default-return Inhibit(false), move |_back_button, event| {
+            match (event.get_button(), webview.get_back_forward_list()) {
+                (3, Some(back_forward_list)) => {
+                    let menu = Menu::new();
+                    for back in back_forward_list.get_back_list() {
+                        let item = MenuItem::new();
+                        item.set_label(&back.get_title().unwrap_or(GString::from("(no title)")));
+                        item.connect_activate(glib::clone!(@weak webview => move |_item| {
+                            webview.go_to_back_forward_list_item(&back);
+                        }));
+                        menu.add(&item);
+                    }
+                    menu.show_all();
+                    menu.popup_at_pointer(Some(&event));
+                    Inhibit(true)
+                },
+                _ => Inhibit(false)
+            }
+        }));
         self.forward_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
                 webview.go_forward();
             }),
         );
+        self.forward_button.connect_button_press_event(glib::clone!(
+                @weak self.viewer.webview as webview => @default-return Inhibit(false), move |_forward_button, event| {
+            match (event.get_button(), webview.get_back_forward_list()) {
+                (3, Some(back_forward_list)) => {
+                    let menu = Menu::new();
+                    // put list items in reverse order
+                    for forward in back_forward_list.get_forward_list().iter().rev() {
+                        let item = MenuItem::new();
+                        item.set_label(&forward.get_title().unwrap_or(GString::from("(no title)")));
+                        item.connect_activate(glib::clone!(@weak webview, @weak forward => move |_item| {
+                            webview.go_to_back_forward_list_item(&forward);
+                        }));
+                        menu.add(&item);
+                    }
+                    menu.show_all();
+                    menu.popup_at_pointer(Some(&event));
+                    Inhibit(true)
+                },
+                _ => Inhibit(false)
+            }
+        }));
         self.reload_or_stop_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
                 if webview.is_loading() {
