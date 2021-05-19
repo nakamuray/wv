@@ -247,8 +247,10 @@ impl Window {
             glib::clone!(@weak self.title.title as title_label => move |webview| {
                 if let Some(title) = webview.get_title() {
                     title_label.set_label(title.as_str());
+                    title_label.set_tooltip_text(Some(title.as_str()));
                 } else {
                     title_label.set_label("");
+                    title_label.set_tooltip_text(None);
                 }
             }),
         );
