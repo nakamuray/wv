@@ -312,6 +312,7 @@ impl Window {
         self.back_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
                 webview.go_back();
+                webview.grab_focus();
             }),
         );
         self.back_button.connect_button_press_event(glib::clone!(
@@ -324,6 +325,7 @@ impl Window {
                         item.set_label(&back.get_title().unwrap_or(GString::from("(no title)")));
                         item.connect_activate(glib::clone!(@weak webview => move |_item| {
                             webview.go_to_back_forward_list_item(&back);
+                            webview.grab_focus();
                         }));
                         menu.add(&item);
                     }
@@ -337,6 +339,7 @@ impl Window {
         self.forward_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
                 webview.go_forward();
+                webview.grab_focus();
             }),
         );
         self.forward_button.connect_button_press_event(glib::clone!(
@@ -350,6 +353,7 @@ impl Window {
                         item.set_label(&forward.get_title().unwrap_or(GString::from("(no title)")));
                         item.connect_activate(glib::clone!(@weak webview, @weak forward => move |_item| {
                             webview.go_to_back_forward_list_item(&forward);
+                            webview.grab_focus();
                         }));
                         menu.add(&item);
                     }
@@ -367,6 +371,7 @@ impl Window {
                 } else {
                     webview.reload();
                 }
+                webview.grab_focus();
             }),
         );
     }
