@@ -8,15 +8,15 @@ use gdk_pixbuf::InterpType;
 use gio::{AppInfo, AppInfoExt};
 use glib::GString;
 use gtk::{
-    Align, Application, ApplicationWindow, BoxBuilder, Button, HeaderBar, HeaderBarExt, IconSize,
-    Image, Label, LabelBuilder, LabelExt, Menu, MenuButton, MenuItem, ModelButtonBuilder,
-    Orientation, PopoverMenu,
+    Align, Application, ApplicationWindow, BoxBuilder, Button, FileChooserAction,
+    FileChooserDialog, HeaderBar, HeaderBarExt, IconSize, Image, Label, LabelBuilder, LabelExt,
+    Menu, MenuButton, MenuItem, ModelButtonBuilder, Orientation, PopoverMenu, ResponseType,
 };
 use gtk_macros::action;
 use pango::EllipsizeMode;
 use webkit2gtk::{
     BackForwardListExt, BackForwardListItemExt, ContextMenu, ContextMenuExt, ContextMenuItem,
-    HitTestResultExt, WebViewExt,
+    DownloadExt, HitTestResultExt, WebContextExt, WebViewExt,
 };
 
 use crate::viewer;
@@ -285,6 +285,28 @@ impl Window {
                 }
             }),
         );
+
+        self.viewer.webview.get_context().unwrap().connect_download_started(glib::clone!(
+                @weak self.widget as window => move |_context, download| {
+            download.connect_decide_destination(move |download, suggested_filename| {
+                let dialog = FileChooserDialog::with_buttons(Some("Download File"), Some(&window), FileChooserAction::Save, &[("_Cancel", ResponseType::Cancel), ("_Save", ResponseType::Accept)]);
+                dialog.set_default_response(ResponseType::Accept);
+                dialog.set_do_overwrite_confirmation(true);
+                if let Some(download_folder) = glib::get_user_special_dir(glib::UserDirectory::Downloads) {
+                    dialog.set_current_folder(&download_folder);
+                }
+                dialog.set_current_name(&suggested_filename);
+                let res = dialog.run();
+                if res == gtk::ResponseType::Accept {
+                    let filename = dialog.get_uri().unwrap();
+                    download.set_destination(&filename);
+                } else {
+                    download.cancel();
+                }
+                dialog.close();
+                false
+            });
+        }));
 
         // XXX: until BackForwardListExt::connect_changed is implemented,
         // poll to check we can go back/forward
