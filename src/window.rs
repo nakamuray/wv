@@ -64,7 +64,9 @@ impl CustomTitle {
             .selectable(true)
             .build();
         subtitle.get_style_context().add_class("subtitle");
-        label_box.pack_start(&subtitle, false, false, 0);
+        let subtitle_box = gtk::Box::new(Orientation::Horizontal, 0);
+        subtitle_box.pack_start(&subtitle, true, false, 0);
+        label_box.pack_start(&subtitle_box, false, false, 0);
 
         Self {
             widget: label_box,
