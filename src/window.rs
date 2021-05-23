@@ -4,83 +4,26 @@ use std::convert::TryInto;
 
 use cairo::ImageSurface;
 use gdk::pixbuf_get_from_surface;
-use gdk_pixbuf::InterpType;
 use gio::{AppInfo, AppInfoExt};
 use glib::GString;
 use gtk::{
-    Align, Application, ApplicationWindow, BoxBuilder, Button, FileChooserAction,
-    FileChooserDialog, HeaderBar, HeaderBarExt, IconSize, Image, Label, LabelBuilder, LabelExt,
-    Menu, MenuButton, MenuItem, ModelButtonBuilder, Orientation, PopoverMenu, ResponseType,
+    Application, ApplicationWindow, BoxBuilder, Button, FileChooserAction, FileChooserDialog,
+    HeaderBarExt, IconSize, Image, Label, Menu, MenuButton, MenuItem, ModelButtonBuilder,
+    Orientation, PopoverMenu, ResponseType,
 };
 use gtk_macros::action;
-use pango::EllipsizeMode;
 use webkit2gtk::{
     BackForwardListExt, BackForwardListItemExt, ContextMenu, ContextMenuExt, ContextMenuItem,
     DownloadExt, HitTestResultExt, WebContextExt, WebViewExt,
 };
 
+use crate::faviconheaderbar;
 use crate::viewer;
-
-struct CustomTitle {
-    widget: gtk::Box,
-    title: Label,
-    subtitle: Label,
-    favicon: Image,
-}
-
-const MIN_TITLE_CHARS: i32 = 6;
-
-impl CustomTitle {
-    fn new() -> Self {
-        let label_box = BoxBuilder::new()
-            .orientation(Orientation::Vertical)
-            .spacing(0)
-            .valign(Align::Center)
-            .build();
-
-        let title_box = BoxBuilder::new()
-            .orientation(Orientation::Horizontal)
-            .spacing(0)
-            .build();
-        let favicon = Image::new();
-        favicon.get_style_context().add_class("favicon");
-        favicon.set_halign(Align::End);
-        title_box.pack_start(&favicon, true, true, 0);
-        let title = LabelBuilder::new()
-            .wrap(false)
-            .single_line_mode(true)
-            .ellipsize(EllipsizeMode::End)
-            .width_chars(MIN_TITLE_CHARS)
-            .halign(Align::Start)
-            .build();
-        title.get_style_context().add_class("title");
-        title_box.pack_start(&title, true, true, 0);
-        label_box.pack_start(&title_box, false, false, 0);
-
-        let subtitle = LabelBuilder::new()
-            .wrap(false)
-            .single_line_mode(true)
-            .ellipsize(EllipsizeMode::End)
-            .selectable(true)
-            .build();
-        subtitle.get_style_context().add_class("subtitle");
-        let subtitle_box = gtk::Box::new(Orientation::Horizontal, 0);
-        subtitle_box.pack_start(&subtitle, true, false, 0);
-        label_box.pack_start(&subtitle_box, false, false, 0);
-
-        Self {
-            widget: label_box,
-            title,
-            subtitle,
-            favicon,
-        }
-    }
-}
 
 pub struct Window {
     pub widget: ApplicationWindow,
     application: Application,
-    title: CustomTitle,
+    header: faviconheaderbar::FaviconHeaderBar,
     back_button: Button,
     forward_button: Button,
     reload_or_stop_button: Button,
@@ -95,10 +38,8 @@ impl Window {
         let viewer = viewer::Viewer::new();
         win.add(&viewer.widget);
 
-        let header = HeaderBar::new();
+        let header = faviconheaderbar::FaviconHeaderBar::new();
         header.set_show_close_button(true);
-        let title = CustomTitle::new();
-        header.set_custom_title(Some(&title.widget));
         win.set_titlebar(Some(&header));
 
         let navigation_buttons = gtk::Box::new(Orientation::Horizontal, 0);
@@ -178,7 +119,7 @@ impl Window {
         let this = Self {
             widget: win,
             application: app.clone(),
-            title,
+            header,
             back_button,
             forward_button,
             reload_or_stop_button,
@@ -245,45 +186,36 @@ impl Window {
         }));
 
         self.viewer.webview.connect_property_title_notify(
-            glib::clone!(@weak self.title.title as title_label => move |webview| {
+            glib::clone!(@weak self.header as header => move |webview| {
                 if let Some(title) = webview.get_title() {
-                    title_label.set_label(title.as_str());
-                    title_label.set_tooltip_text(Some(title.as_str()));
+                    header.set_title(Some(&title));
                 } else {
-                    title_label.set_label("");
-                    title_label.set_tooltip_text(None);
+                    header.set_title(None);
                 }
             }),
         );
 
         self.viewer.webview.connect_property_uri_notify(
-            glib::clone!(@weak self.title.subtitle as subtitle => move |webview| {
+            glib::clone!(@weak self.header as header => move |webview| {
                 if let Some(uri) = webview.get_uri() {
-                    subtitle.set_label(uri.as_str());
+                    header.set_subtitle(Some(uri.as_str()));
                 } else {
-                    subtitle.set_label("");
+                    header.set_subtitle(None);
                 }
             }),
         );
 
         self.viewer.webview.connect_property_favicon_notify(
-            glib::clone!(@weak self.title.favicon as favicon => move |webview| {
+            glib::clone!(@weak self.header as header => move |webview| {
                 if let Some(surface) = webview.get_favicon() {
                     let image_surface: ImageSurface = surface.try_into().expect("image surface expected");
                     let width = image_surface.get_width();
                     let height = image_surface.get_height();
-                    let mut pixbuf = pixbuf_get_from_surface(&image_surface, 0, 0, width, height).unwrap();
+                    let pixbuf = pixbuf_get_from_surface(&image_surface, 0, 0, width, height).unwrap();
 
-                    const FAVICON_SIZE: i32 = 16;
-                    let scale = favicon.get_scale_factor();
-                    let favicon_size = FAVICON_SIZE * scale;
-                    if favicon_size != width || favicon_size != height {
-                        pixbuf = pixbuf.scale_simple(favicon_size, favicon_size, InterpType::Bilinear).unwrap();
-                    }
-                    favicon.set_from_pixbuf(Some(&pixbuf));
-
+                    header.set_favicon(Some(&pixbuf));
                 } else {
-                    favicon.clear();
+                    header.set_favicon(None);
                 }
             }),
         );

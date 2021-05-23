@@ -758,6 +758,7 @@ dependencies = [
  "glib",
  "gtk",
  "gtk-macros",
+ "once_cell",
  "pango",
  "serde",
  "serde_derive",

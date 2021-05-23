@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use gtk::Application;
 
+mod faviconheaderbar;
 mod settings;
 mod viewer;
 mod window;
