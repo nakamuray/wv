@@ -29,29 +29,15 @@ fn main() {
         );
     });
     app.connect_open(glib::clone!(@strong settings => move |app, files, _hints| {
-        let window_settings = &settings.borrow().window;
         for f in files {
-            let win = window::Window::new(&app);
-            win.widget.set_default_size(window_settings.width, window_settings.height);
+            let win = window::Window::new(&app, settings.clone());
             win.widget.show_all();
-            win.widget.connect_size_allocate(glib::clone!(@strong settings => move |win, _rect| {
-                let (width, height) = win.get_size();
-                (*settings.borrow_mut()).window.height = height;
-                (*settings.borrow_mut()).window.width = width;
-            }));
             win.load_uri(&f.get_uri());
         }
     }));
     app.connect_activate(glib::clone!(@strong settings => move |app| {
-        let window_settings = &settings.borrow().window;
-        let win = window::Window::new(&app);
-        win.widget.set_default_size(window_settings.width, window_settings.height);
+        let win = window::Window::new(&app, settings.clone());
         win.widget.show_all();
-        win.widget.connect_size_allocate(glib::clone!(@strong settings => move |win, _rect| {
-            let (width, height) = win.get_size();
-            (*settings.borrow_mut()).window.height = height;
-            (*settings.borrow_mut()).window.width = width;
-        }));
         win.load_uri("about:blank");
     }));
     app.connect_shutdown(glib::clone!(@strong settings => move |_app| {

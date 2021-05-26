@@ -1,6 +1,8 @@
 use gio::prelude::*;
 use gtk::prelude::*;
+use std::cell::RefCell;
 use std::convert::TryInto;
+use std::rc::Rc;
 
 use cairo::ImageSurface;
 use gdk::pixbuf_get_from_surface;
@@ -14,15 +16,17 @@ use gtk::{
 use gtk_macros::action;
 use webkit2gtk::{
     BackForwardListExt, BackForwardListItemExt, ContextMenu, ContextMenuExt, ContextMenuItem,
-    DownloadExt, HitTestResultExt, WebContextExt, WebViewExt,
+    DownloadExt, HitTestResultExt, NavigationType, URIRequestExt, WebContextExt, WebViewExt,
 };
 
 use crate::faviconheaderbar;
+use crate::settings::Settings;
 use crate::viewer;
 
 pub struct Window {
     pub widget: ApplicationWindow,
     application: Application,
+    pub settings: Rc<RefCell<Settings>>,
     header: faviconheaderbar::FaviconHeaderBar,
     back_button: Button,
     forward_button: Button,
@@ -31,9 +35,13 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(app: &Application) -> Self {
+    pub fn new(app: &Application, settings: Rc<RefCell<Settings>>) -> Self {
         let win = ApplicationWindow::new(app);
         win.set_title("Web View");
+        win.set_default_size(
+            settings.borrow().window.width,
+            settings.borrow().window.height,
+        );
 
         let viewer = viewer::Viewer::new();
         win.add(&viewer.widget);
@@ -123,6 +131,7 @@ impl Window {
         let this = Self {
             widget: win,
             application: app.clone(),
+            settings,
             header,
             back_button,
             forward_button,
@@ -134,6 +143,14 @@ impl Window {
         this
     }
     fn connect_signals(&self) {
+        self.widget.connect_size_allocate(
+            glib::clone!(@strong self.settings as settings => move |win, _rect| {
+                let (width, height) = win.get_size();
+                (*settings.borrow_mut()).window.height = height;
+                (*settings.borrow_mut()).window.width = width;
+            }),
+        );
+
         self.viewer.webview.connect_context_menu(
             |_webview, context_menu, _event, hit_test_result| {
                 if hit_test_result.context_is_link() {
@@ -246,6 +263,22 @@ impl Window {
                 dialog.close();
                 false
             });
+        }));
+
+        self.viewer.webview.connect_create(glib::clone!(
+                @weak self.application as app,
+                @strong self.settings as settings => @default-return None, move |_webview, navigation_action| {
+            if navigation_action.get_navigation_type() == NavigationType::Other {
+                if let Some(req) = navigation_action.get_request() {
+                    if let Some(uri) = req.get_uri() {
+                        // action from "Open Link in New Window" context menu (maybe)
+                        let win = Window::new(&app, settings.clone());
+                        win.widget.show_all();
+                        win.load_uri(&uri);
+                    }
+                }
+            }
+            None
         }));
 
         // XXX: until BackForwardListExt::connect_changed is implemented,
