@@ -48,11 +48,13 @@ impl Window {
         let back_button =
             Button::from_icon_name(Some("go-previous-symbolic"), IconSize::SmallToolbar);
         back_button.set_sensitive(false);
+        back_button.set_tooltip_text(Some("go back"));
         navigation_buttons.pack_start(&back_button, false, false, 0);
 
         let forward_button =
             Button::from_icon_name(Some("go-next-symbolic"), IconSize::SmallToolbar);
         forward_button.set_sensitive(false);
+        forward_button.set_tooltip_text(Some("go forward"));
         navigation_buttons.pack_start(&forward_button, false, false, 0);
 
         header.pack_start(&navigation_buttons);
@@ -61,6 +63,7 @@ impl Window {
             Some("emblem-synchronizing-symbolic"),
             IconSize::SmallToolbar,
         );
+        reload_or_stop_button.set_tooltip_text(Some("reload"));
         header.pack_start(&reload_or_stop_button);
 
         let menu_button = MenuButton::new();
@@ -68,6 +71,7 @@ impl Window {
             Some("document-send-symbolic"),
             IconSize::SmallToolbar,
         )));
+        menu_button.set_tooltip_text(Some("re-open page with ..."));
         header.pack_end(&menu_button);
 
         let menu_popover = PopoverMenu::new();
@@ -180,8 +184,10 @@ impl Window {
 
             if webview.is_loading() {
                 reload_or_stop_button.set_image(Some(&Image::from_icon_name(Some("process-stop-symbolic"), IconSize::SmallToolbar)));
+                reload_or_stop_button.set_tooltip_text(Some("stop"));
             } else {
                 reload_or_stop_button.set_image(Some(&Image::from_icon_name(Some("emblem-synchronizing-symbolic"), IconSize::SmallToolbar)));
+                reload_or_stop_button.set_tooltip_text(Some("reload"));
             }
         }));
 
