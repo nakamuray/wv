@@ -1,13 +1,19 @@
 use gtk::prelude::*;
 
+use gtk::glib;
+use gtk::glib::clone;
+
 use gtk::{
-    Align, Label, Orientation, Overlay, ProgressBar, ProgressBarBuilder, SearchBar, SearchBarExt,
-    SearchEntry,
+    traits::SearchBarExt, Align, Label, Orientation, Overlay, ProgressBar, ProgressBarBuilder,
+    SearchBar, SearchEntry,
+};
+use webkit2gtk::traits::{
+    CookieManagerExt, FindControllerExt, HitTestResultExt, NavigationPolicyDecisionExt,
+    SettingsExt, WebContextExt, WebViewExt,
 };
 use webkit2gtk::{
-    CookieAcceptPolicy, CookieManagerExt, FindControllerExt, FindOptions, HitTestResultExt,
-    NavigationPolicyDecision, NavigationPolicyDecisionExt, PolicyDecisionType, SettingsExt,
-    WebContext, WebContextExt, WebView, WebViewExt,
+    CookieAcceptPolicy, FindOptions, NavigationPolicyDecision, PolicyDecisionType, WebContext,
+    WebView,
 };
 
 pub struct Viewer {
@@ -28,12 +34,12 @@ impl Viewer {
         let context = WebContext::new_ephemeral();
         context.set_sandbox_enabled(true);
         context
-            .get_cookie_manager()
+            .cookie_manager()
             .unwrap()
             .set_accept_policy(CookieAcceptPolicy::NoThirdParty);
         context.set_favicon_database_directory(None);
         let webview = WebView::with_context(&context);
-        WebViewExt::get_settings(&webview)
+        WebViewExt::settings(&webview)
             .unwrap()
             .set_enable_smooth_scrolling(true);
         overlay.add(&webview);
@@ -52,7 +58,7 @@ impl Viewer {
             .valign(gtk::Align::End)
             .no_show_all(true)
             .build();
-        status_bar.get_style_context().add_class("status-bar");
+        status_bar.style_context().add_class("status-bar");
         overlay.add_overlay(&status_bar);
         overlay.set_overlay_pass_through(&status_bar, true);
 
@@ -85,16 +91,15 @@ impl Viewer {
         this
     }
     fn setup_callbacks(&self) {
-        self.webview
-            .connect_property_estimated_load_progress_notify(glib::clone!(
-            @weak self.progress_bar as progress_bar => move |webview| {
-                if webview.is_loading() {
-                    progress_bar.show();
-                    progress_bar.set_fraction(webview.get_estimated_load_progress());
-                } else {
-                    progress_bar.hide();
-                }
-            }));
+        self.webview.connect_estimated_load_progress_notify(clone!(
+        @weak self.progress_bar as progress_bar => move |webview| {
+            if webview.is_loading() {
+                progress_bar.show();
+                progress_bar.set_fraction(webview.estimated_load_progress());
+            } else {
+                progress_bar.hide();
+            }
+        }));
         self.webview.connect_load_changed(glib::clone!(
             @weak self.progress_bar as progress_bar => move |_webview, event| {
                 if event == webkit2gtk::LoadEvent::Finished {
@@ -105,7 +110,7 @@ impl Viewer {
         self.webview.connect_mouse_target_changed(
             glib::clone!(@weak self.status_bar as status_bar => move |_webview, hit_test_result, _modofiers| {
                 if hit_test_result.context_is_link() {
-                    status_bar.set_label(&hit_test_result.get_link_uri().unwrap());
+                    status_bar.set_label(&hit_test_result.link_uri().unwrap());
                     status_bar.show();
                 } else {
                     status_bar.hide();
@@ -119,8 +124,8 @@ impl Viewer {
                     PolicyDecisionType::NewWindowAction => {
                         let navigation_decision: &NavigationPolicyDecision =
                             decision.downcast_ref().unwrap();
-                        let action = navigation_decision.get_navigation_action().unwrap();
-                        let request = action.get_request().unwrap();
+                        let action = navigation_decision.navigation_action().unwrap();
+                        let request = action.request().unwrap();
                         // open link in this window, not new window
                         webview.load_request(&request);
                         true
@@ -129,10 +134,10 @@ impl Viewer {
                 }
             });
 
-        let find_controller = self.webview.get_find_controller().unwrap();
+        let find_controller = self.webview.find_controller().unwrap();
         self.search_entry.connect_activate(glib::clone!(@weak find_controller => move |search_entry| {
-            let search_text = search_entry.get_text();
-            match find_controller.get_search_text() {
+            let search_text = search_entry.text();
+            match find_controller.search_text() {
                 Some(s) if s == search_text => {
                     find_controller.search_next();
                 },

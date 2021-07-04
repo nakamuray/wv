@@ -1,15 +1,12 @@
-use gdk_pixbuf::{InterpType, Pixbuf};
-use gio::prelude::*;
-use glib::subclass;
-use glib::translate::*;
+use gtk::gdk_pixbuf::{InterpType, Pixbuf};
+use gtk::glib;
+use gtk::pango::EllipsizeMode;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 use once_cell::unsync::OnceCell;
-use pango::EllipsizeMode;
 
-use gtk::{
-    Align, BoxBuilder, HeaderBar, HeaderBarExt, Image, Label, LabelBuilder, LabelExt, Orientation,
-};
+use gtk::traits::{HeaderBarExt, LabelExt};
+use gtk::{Align, BoxBuilder, HeaderBar, Image, Label, LabelBuilder, Orientation};
 
 #[derive(Debug)]
 struct FaviconTitle {
@@ -35,7 +32,7 @@ impl FaviconTitle {
             .spacing(0)
             .build();
         let favicon = Image::new();
-        favicon.get_style_context().add_class("favicon");
+        favicon.style_context().add_class("favicon");
         favicon.set_halign(Align::End);
         title_box.pack_start(&favicon, true, true, 0);
         let title = LabelBuilder::new()
@@ -45,7 +42,7 @@ impl FaviconTitle {
             .width_chars(MIN_TITLE_CHARS)
             .halign(Align::Start)
             .build();
-        title.get_style_context().add_class("title");
+        title.style_context().add_class("title");
         title_box.pack_start(&title, true, true, 0);
         label_box.pack_start(&title_box, false, false, 0);
 
@@ -55,7 +52,7 @@ impl FaviconTitle {
             .ellipsize(EllipsizeMode::End)
             .selectable(true)
             .build();
-        subtitle.get_style_context().add_class("subtitle");
+        subtitle.style_context().add_class("subtitle");
         let subtitle_box = gtk::Box::new(Orientation::Horizontal, 0);
         subtitle_box.pack_start(&subtitle, true, false, 0);
         label_box.pack_start(&subtitle_box, false, false, 0);
@@ -74,31 +71,27 @@ pub struct FaviconHeaderBarPriv {
     favicontitle: OnceCell<FaviconTitle>,
 }
 
-impl ObjectSubclass for FaviconHeaderBarPriv {
-    const NAME: &'static str = "FaviconHeaderBar";
-    type ParentType = HeaderBar;
-    type Instance = subclass::simple::InstanceStruct<Self>;
-    type Class = subclass::simple::ClassStruct<Self>;
-
-    glib::glib_object_subclass!();
-
-    fn new() -> Self {
+impl Default for FaviconHeaderBarPriv {
+    fn default() -> Self {
         Self {
             favicontitle: OnceCell::new(),
         }
     }
 }
 
-impl ObjectImpl for FaviconHeaderBarPriv {
-    glib::glib_object_impl!();
+#[glib::object_subclass]
+impl ObjectSubclass for FaviconHeaderBarPriv {
+    const NAME: &'static str = "FaviconHeaderBar";
+    type Type = FaviconHeaderBar;
+    type ParentType = HeaderBar;
+}
 
-    fn constructed(&self, obj: &glib::Object) {
+impl ObjectImpl for FaviconHeaderBarPriv {
+    fn constructed(&self, obj: &Self::Type) {
         self.parent_constructed(obj);
 
-        let this = obj.downcast_ref::<FaviconHeaderBar>().unwrap();
-
         let favicontitle = FaviconTitle::new();
-        this.set_custom_title(Some(&favicontitle.widget));
+        obj.set_custom_title(Some(&favicontitle.widget));
 
         self.favicontitle
             .set(favicontitle)
@@ -110,24 +103,14 @@ impl HeaderBarImpl for FaviconHeaderBarPriv {}
 impl ContainerImpl for FaviconHeaderBarPriv {}
 impl WidgetImpl for FaviconHeaderBarPriv {}
 
-glib::glib_wrapper! {
-    pub struct FaviconHeaderBar(
-        Object<subclass::simple::InstanceStruct<FaviconHeaderBarPriv>,
-        subclass::simple::ClassStruct<FaviconHeaderBarPriv>,
-        FaviconHeaderBarClass>)
+glib::wrapper! {
+    pub struct FaviconHeaderBar(ObjectSubclass<FaviconHeaderBarPriv>)
         @extends gtk::HeaderBar, gtk::Container, gtk::Widget;
-
-    match fn {
-        get_type => || FaviconHeaderBarPriv::get_type().to_glib(),
-    }
 }
 
 impl FaviconHeaderBar {
     pub fn new() -> Self {
-        glib::Object::new(Self::static_type(), &[])
-            .expect("Faled to create FaviconHeaderBar")
-            .downcast()
-            .expect("Created FaviconHeaderBar is of wrong type")
+        glib::Object::new(&[]).expect("Faled to create FaviconHeaderBar")
     }
 
     pub fn set_title(&self, title: Option<&str>) {
@@ -152,10 +135,10 @@ impl FaviconHeaderBar {
         let favicontitle = self.get_favicontitle();
 
         if let Some(favicon) = favicon {
-            let scale = favicontitle.favicon.get_scale_factor();
+            let scale = favicontitle.favicon.scale_factor();
             let favicon_size = FAVICON_SIZE * scale;
 
-            if favicon_size != favicon.get_width() || favicon_size != favicon.get_height() {
+            if favicon_size != favicon.width() || favicon_size != favicon.height() {
                 let favicon = &favicon
                     .scale_simple(favicon_size, favicon_size, InterpType::Bilinear)
                     .unwrap();

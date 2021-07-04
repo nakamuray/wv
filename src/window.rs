@@ -1,23 +1,26 @@
-use gio::prelude::*;
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::rc::Rc;
+use std::time::Duration;
 
-use cairo::ImageSurface;
-use gdk::pixbuf_get_from_surface;
-use gio::{AppInfo, AppInfoExt};
-use glib::GString;
+use gtk::cairo::ImageSurface;
+use gtk::gdk::pixbuf_get_from_surface;
+use gtk::gio::{traits::AppInfoExt, AppInfo};
+use gtk::glib::{clone, GString};
+use gtk::traits::{HeaderBarExt, SearchBarExt};
+use gtk::{gio, glib};
 use gtk::{
     Application, ApplicationWindow, BoxBuilder, Button, FileChooserAction, FileChooserDialog,
-    HeaderBarExt, IconSize, Image, Label, Menu, MenuButton, MenuItem, ModelButtonBuilder,
-    Orientation, PopoverMenu, ResponseType,
+    IconSize, Image, Label, Menu, MenuButton, MenuItem, ModelButtonBuilder, Orientation,
+    PopoverMenu, ResponseType,
 };
 use gtk_macros::action;
-use webkit2gtk::{
-    BackForwardListExt, BackForwardListItemExt, ContextMenu, ContextMenuExt, ContextMenuItem,
-    DownloadExt, HitTestResultExt, NavigationType, URIRequestExt, WebContextExt, WebViewExt,
+use webkit2gtk::traits::{
+    BackForwardListExt, BackForwardListItemExt, ContextMenuExt, DownloadExt, HitTestResultExt,
+    URIRequestExt, WebContextExt, WebViewExt,
 };
+use webkit2gtk::{ContextMenu, ContextMenuItem, NavigationType};
 
 use crate::faviconheaderbar;
 use crate::settings::Settings;
@@ -51,7 +54,7 @@ impl Window {
         win.set_titlebar(Some(&header));
 
         let navigation_buttons = gtk::Box::new(Orientation::Horizontal, 0);
-        navigation_buttons.get_style_context().add_class("linked");
+        navigation_buttons.style_context().add_class("linked");
 
         let back_button =
             Button::from_icon_name(Some("go-previous-symbolic"), IconSize::SmallToolbar);
@@ -98,26 +101,26 @@ impl Window {
         let label = Label::new(Some("Re-Open Page with ..."));
         menu_box.pack_start(&label, false, false, 0);
 
-        let browsers = AppInfo::get_recommended_for_type("x-scheme-handler/http");
+        let browsers = AppInfo::recommended_for_type("x-scheme-handler/http");
         for info in browsers.iter() {
-            if info.get_id() == Some(GString::from("wv.desktop")) {
+            if info.id() == Some(GString::from("wv.desktop")) {
                 // skip myself
                 continue;
             };
             let button = ModelButtonBuilder::new()
                 .always_show_image(true)
                 .image(&Image::from_gicon(
-                    &info.get_icon().unwrap(),
+                    &info.icon().unwrap(),
                     IconSize::SmallToolbar,
                 ))
-                .label(&info.get_name().unwrap())
+                .label(&info.name())
                 .halign(gtk::Align::Start)
                 .build();
             menu_box.pack_start(&button, false, false, 0);
 
             button.connect_clicked(
-                glib::clone!(@strong info, @weak viewer.webview as webview => move |_button| {
-                    if let Some(uri) = webview.get_uri() {
+                clone!(@strong info, @weak viewer.webview as webview => move |_button| {
+                    if let Some(uri) = webview.uri() {
                         if let Err(e) = info.launch_uris::<gio::AppLaunchContext>(&[&uri], None) {
                             eprintln!("{:?}", e);
                         }
@@ -145,7 +148,7 @@ impl Window {
     fn connect_signals(&self) {
         self.widget.connect_size_allocate(
             glib::clone!(@strong self.settings as settings => move |win, _rect| {
-                let (width, height) = win.get_size();
+                let (width, height) = win.size();
                 (*settings.borrow_mut()).window.height = height;
                 (*settings.borrow_mut()).window.width = width;
             }),
@@ -154,18 +157,18 @@ impl Window {
         self.viewer.webview.connect_context_menu(
             |_webview, context_menu, _event, hit_test_result| {
                 if hit_test_result.context_is_link() {
-                    let uri = hit_test_result.get_link_uri().unwrap().to_string();
+                    let uri = hit_test_result.link_uri().unwrap().to_string();
 
-                    let browsers = AppInfo::get_recommended_for_type("x-scheme-handler/http");
+                    let browsers = AppInfo::recommended_for_type("x-scheme-handler/http");
                     let open_link_menu = ContextMenu::new();
 
                     for info in browsers.iter() {
-                        if info.get_id() == Some(GString::from("wv.desktop")) {
+                        if info.id() == Some(GString::from("wv.desktop")) {
                             // skip myself
                             continue;
                         };
-                        let action = gio::SimpleAction::new(&info.get_id().unwrap(), None);
-                        let name = info.get_name().unwrap();
+                        let action = gio::SimpleAction::new(&info.id().unwrap(), None);
+                        let name = info.name();
                         action.connect_activate(
                     glib::clone!(@strong info, @strong uri => move |_action, _parameter| {
                         if let Err(e) = info.launch_uris::<gio::AppLaunchContext>(&[&uri], None) {
@@ -208,9 +211,9 @@ impl Window {
             }
         }));
 
-        self.viewer.webview.connect_property_title_notify(
+        self.viewer.webview.connect_title_notify(
             glib::clone!(@weak self.header as header => move |webview| {
-                if let Some(title) = webview.get_title() {
+                if let Some(title) = webview.title() {
                     header.set_title(Some(&title));
                 } else {
                     header.set_title(None);
@@ -218,9 +221,9 @@ impl Window {
             }),
         );
 
-        self.viewer.webview.connect_property_uri_notify(
+        self.viewer.webview.connect_uri_notify(
             glib::clone!(@weak self.header as header => move |webview| {
-                if let Some(uri) = webview.get_uri() {
+                if let Some(uri) = webview.uri() {
                     header.set_subtitle(Some(uri.as_str()));
                 } else {
                     header.set_subtitle(None);
@@ -228,12 +231,12 @@ impl Window {
             }),
         );
 
-        self.viewer.webview.connect_property_favicon_notify(
+        self.viewer.webview.connect_favicon_notify(
             glib::clone!(@weak self.header as header => move |webview| {
-                if let Some(surface) = webview.get_favicon() {
+                if let Some(surface) = webview.favicon() {
                     let image_surface: ImageSurface = surface.try_into().expect("image surface expected");
-                    let width = image_surface.get_width();
-                    let height = image_surface.get_height();
+                    let width = image_surface.width();
+                    let height = image_surface.height();
                     let pixbuf = pixbuf_get_from_surface(&image_surface, 0, 0, width, height).unwrap();
 
                     header.set_favicon(Some(&pixbuf));
@@ -243,19 +246,18 @@ impl Window {
             }),
         );
 
-        self.viewer.webview.get_context().unwrap().connect_download_started(glib::clone!(
+        self.viewer.webview.context().unwrap().connect_download_started(glib::clone!(
                 @weak self.widget as window => move |_context, download| {
             download.connect_decide_destination(move |download, suggested_filename| {
                 let dialog = FileChooserDialog::with_buttons(Some("Download File"), Some(&window), FileChooserAction::Save, &[("_Cancel", ResponseType::Cancel), ("_Save", ResponseType::Accept)]);
                 dialog.set_default_response(ResponseType::Accept);
                 dialog.set_do_overwrite_confirmation(true);
-                if let Some(download_folder) = glib::get_user_special_dir(glib::UserDirectory::Downloads) {
-                    dialog.set_current_folder(&download_folder);
-                }
+                let download_folder = glib::user_special_dir(glib::UserDirectory::Downloads);
+                dialog.set_current_folder(&download_folder);
                 dialog.set_current_name(&suggested_filename);
                 let res = dialog.run();
                 if res == gtk::ResponseType::Accept {
-                    let filename = dialog.get_uri().unwrap();
+                    let filename = dialog.uri().unwrap();
                     download.set_destination(&filename);
                 } else {
                     download.cancel();
@@ -268,9 +270,9 @@ impl Window {
         self.viewer.webview.connect_create(glib::clone!(
                 @weak self.application as app,
                 @strong self.settings as settings => @default-return None, move |_webview, navigation_action| {
-            if navigation_action.get_navigation_type() == NavigationType::Other {
-                if let Some(req) = navigation_action.get_request() {
-                    if let Some(uri) = req.get_uri() {
+            if navigation_action.navigation_type() == NavigationType::Other {
+                if let Some(req) = navigation_action.request() {
+                    if let Some(uri) = req.uri() {
                         // action from "Open Link in New Window" context menu (maybe)
                         let win = Window::new(&app, settings.clone());
                         win.widget.show_all();
@@ -284,7 +286,7 @@ impl Window {
         // XXX: until BackForwardListExt::connect_changed is implemented,
         // poll to check we can go back/forward
         glib::timeout_add_local(
-            1000,
+            Duration::from_secs(1),
             glib::clone!(
                     @weak self.viewer.webview as webview,
                     @weak self.back_button as back_button,
@@ -311,12 +313,12 @@ impl Window {
         );
         self.back_button.connect_button_press_event(glib::clone!(
                 @weak self.viewer.webview as webview => @default-return Inhibit(false), move |_back_button, event| {
-            match (event.get_button(), webview.get_back_forward_list()) {
+            match (event.button(), webview.back_forward_list()) {
                 (3, Some(back_forward_list)) => {
                     let menu = Menu::new();
-                    for back in back_forward_list.get_back_list() {
+                    for back in back_forward_list.back_list() {
                         let item = MenuItem::new();
-                        item.set_label(&back.get_title().unwrap_or(GString::from("(no title)")));
+                        item.set_label(&back.title().unwrap_or(GString::from("(no title)")));
                         item.connect_activate(glib::clone!(@weak webview => move |_item| {
                             webview.go_to_back_forward_list_item(&back);
                             webview.grab_focus();
@@ -338,13 +340,13 @@ impl Window {
         );
         self.forward_button.connect_button_press_event(glib::clone!(
                 @weak self.viewer.webview as webview => @default-return Inhibit(false), move |_forward_button, event| {
-            match (event.get_button(), webview.get_back_forward_list()) {
+            match (event.button(), webview.back_forward_list()) {
                 (3, Some(back_forward_list)) => {
                     let menu = Menu::new();
                     // put list items in reverse order
-                    for forward in back_forward_list.get_forward_list().iter().rev() {
+                    for forward in back_forward_list.forward_list().iter().rev() {
                         let item = MenuItem::new();
-                        item.set_label(&forward.get_title().unwrap_or(GString::from("(no title)")));
+                        item.set_label(&forward.title().unwrap_or(GString::from("(no title)")));
                         item.connect_activate(glib::clone!(@weak webview, @weak forward => move |_item| {
                             webview.go_to_back_forward_list_item(&forward);
                             webview.grab_focus();
@@ -384,7 +386,7 @@ impl Window {
             self.widget,
             "find",
             glib::clone!(@weak self.viewer.search_bar as search_bar => move |_action, _parameter| {
-                if !search_bar.get_search_mode() {
+                if !search_bar.is_search_mode() {
                     search_bar.set_search_mode(true);
                 }
             })

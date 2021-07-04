@@ -1,5 +1,6 @@
-use gio::prelude::*;
-use gio::{Cancellable, File};
+use gtk::gio::prelude::*;
+use gtk::gio::{Cancellable, File};
+use gtk::{gio, glib};
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -24,7 +25,7 @@ fn default_height() -> i32 {
 }
 
 fn get_app_config_dir() -> Option<std::path::PathBuf> {
-    let mut path = glib::get_user_config_dir()?;
+    let mut path = glib::user_config_dir();
     path.push("wv");
     Some(path)
 }
@@ -33,7 +34,7 @@ const SETTINGS_FILE_NAME: &'static str = "settings.toml";
 
 pub fn load_settings() -> Settings {
     if let Some(mut settings_path) = get_app_config_dir() {
-        let settings_dir = File::new_for_path(&settings_path);
+        let settings_dir = File::for_path(&settings_path);
         if !settings_dir.query_exists::<Cancellable>(None) {
             settings_dir
                 .make_directory_with_parents::<Cancellable>(None)
@@ -43,7 +44,7 @@ pub fn load_settings() -> Settings {
                 });
         }
         settings_path.push(SETTINGS_FILE_NAME);
-        let settings_file = File::new_for_path(settings_path);
+        let settings_file = File::for_path(settings_path);
         if let Ok((data, _)) = settings_file.load_contents::<Cancellable>(None) {
             match toml::from_slice(&data) {
                 Ok(settings) => {
@@ -65,7 +66,7 @@ pub fn load_settings() -> Settings {
 
 pub fn save_settings(settings: &Settings) {
     if let Some(mut settings_path) = get_app_config_dir() {
-        let settings_dir = gio::File::new_for_path(&settings_path);
+        let settings_dir = gio::File::for_path(&settings_path);
         if !settings_dir.query_exists::<gio::Cancellable>(None) {
             settings_dir
                 .make_directory_with_parents::<Cancellable>(None)
@@ -76,7 +77,7 @@ pub fn save_settings(settings: &Settings) {
         }
         settings_path.push(SETTINGS_FILE_NAME);
         let settings_data = toml::to_vec(settings).unwrap();
-        let settings_file = gio::File::new_for_path(settings_path);
+        let settings_file = gio::File::for_path(settings_path);
         if let Err(e) = settings_file.replace_contents::<gio::Cancellable>(
             &settings_data,
             None,
