@@ -5,8 +5,9 @@ use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 use once_cell::unsync::OnceCell;
 
+use gtk::builders::{BoxBuilder, LabelBuilder};
 use gtk::traits::{HeaderBarExt, LabelExt};
-use gtk::{Align, BoxBuilder, HeaderBar, Image, Label, LabelBuilder, Orientation};
+use gtk::{Align, HeaderBar, Image, Label, Orientation};
 
 #[derive(Debug)]
 struct FaviconTitle {

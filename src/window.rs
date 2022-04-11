@@ -4,6 +4,7 @@ use std::convert::TryInto;
 use std::rc::Rc;
 use std::time::Duration;
 
+use gtk::builders::{BoxBuilder, ModelButtonBuilder};
 use gtk::cairo::ImageSurface;
 use gtk::gdk::pixbuf_get_from_surface;
 use gtk::gio::{traits::AppInfoExt, AppInfo};
@@ -11,9 +12,8 @@ use gtk::glib::{clone, GString};
 use gtk::traits::{HeaderBarExt, SearchBarExt};
 use gtk::{gio, glib};
 use gtk::{
-    Application, ApplicationWindow, BoxBuilder, Button, FileChooserAction, FileChooserDialog,
-    IconSize, Image, Label, Menu, MenuButton, MenuItem, ModelButtonBuilder, Orientation,
-    PopoverMenu, ResponseType,
+    Application, ApplicationWindow, Button, FileChooserAction, FileChooserDialog, IconSize, Image,
+    Label, Menu, MenuButton, MenuItem, Orientation, PopoverMenu, ResponseType,
 };
 use gtk_macros::action;
 use webkit2gtk::traits::{
@@ -121,7 +121,7 @@ impl Window {
             button.connect_clicked(
                 clone!(@strong info, @weak viewer.webview as webview => move |_button| {
                     if let Some(uri) = webview.uri() {
-                        if let Err(e) = info.launch_uris::<gio::AppLaunchContext>(&[&uri], None) {
+                        if let Err(e) = info.launch_uris(&[&uri], gio::AppLaunchContext::NONE) {
                             eprintln!("{:?}", e);
                         }
                     }
@@ -171,7 +171,7 @@ impl Window {
                         let name = info.name();
                         action.connect_activate(
                     glib::clone!(@strong info, @strong uri => move |_action, _parameter| {
-                        if let Err(e) = info.launch_uris::<gio::AppLaunchContext>(&[&uri], None) {
+                        if let Err(e) = info.launch_uris(&[&uri], gio::AppLaunchContext::NONE) {
                             eprintln!("{:?}", e);
                         }
                     }),
@@ -252,8 +252,9 @@ impl Window {
                 let dialog = FileChooserDialog::with_buttons(Some("Download File"), Some(&window), FileChooserAction::Save, &[("_Cancel", ResponseType::Cancel), ("_Save", ResponseType::Accept)]);
                 dialog.set_default_response(ResponseType::Accept);
                 dialog.set_do_overwrite_confirmation(true);
-                let download_folder = glib::user_special_dir(glib::UserDirectory::Downloads);
-                dialog.set_current_folder(&download_folder);
+                if let Some(download_folder) = glib::user_special_dir(glib::UserDirectory::Downloads) {
+                    dialog.set_current_folder(&download_folder);
+                }
                 dialog.set_current_name(&suggested_filename);
                 let res = dialog.run();
                 if res == gtk::ResponseType::Accept {

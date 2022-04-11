@@ -35,9 +35,9 @@ const SETTINGS_FILE_NAME: &'static str = "settings.toml";
 pub fn load_settings() -> Settings {
     if let Some(mut settings_path) = get_app_config_dir() {
         let settings_dir = File::for_path(&settings_path);
-        if !settings_dir.query_exists::<Cancellable>(None) {
+        if !settings_dir.query_exists(Cancellable::NONE) {
             settings_dir
-                .make_directory_with_parents::<Cancellable>(None)
+                .make_directory_with_parents(Cancellable::NONE)
                 .unwrap_or_else(|e| {
                     // TODO: log
                     dbg!(e);
@@ -45,7 +45,7 @@ pub fn load_settings() -> Settings {
         }
         settings_path.push(SETTINGS_FILE_NAME);
         let settings_file = File::for_path(settings_path);
-        if let Ok((data, _)) = settings_file.load_contents::<Cancellable>(None) {
+        if let Ok((data, _)) = settings_file.load_contents(Cancellable::NONE) {
             match toml::from_slice(&data) {
                 Ok(settings) => {
                     return settings;
@@ -67,9 +67,9 @@ pub fn load_settings() -> Settings {
 pub fn save_settings(settings: &Settings) {
     if let Some(mut settings_path) = get_app_config_dir() {
         let settings_dir = gio::File::for_path(&settings_path);
-        if !settings_dir.query_exists::<gio::Cancellable>(None) {
+        if !settings_dir.query_exists(Cancellable::NONE) {
             settings_dir
-                .make_directory_with_parents::<Cancellable>(None)
+                .make_directory_with_parents(Cancellable::NONE)
                 .unwrap_or_else(|e| {
                     // TODO: log
                     dbg!(e);
@@ -78,12 +78,12 @@ pub fn save_settings(settings: &Settings) {
         settings_path.push(SETTINGS_FILE_NAME);
         let settings_data = toml::to_vec(settings).unwrap();
         let settings_file = gio::File::for_path(settings_path);
-        if let Err(e) = settings_file.replace_contents::<gio::Cancellable>(
+        if let Err(e) = settings_file.replace_contents(
             &settings_data,
             None,
             false,
             gio::FileCreateFlags::NONE,
-            None,
+            Cancellable::NONE,
         ) {
             dbg!(e);
         }

@@ -3,9 +3,9 @@ use gtk::prelude::*;
 use gtk::glib;
 use gtk::glib::clone;
 
+use gtk::builders::{LabelBuilder, ProgressBarBuilder};
 use gtk::{
-    traits::SearchBarExt, Align, Label, Orientation, Overlay, ProgressBar, ProgressBarBuilder,
-    SearchBar, SearchEntry,
+    traits::SearchBarExt, Align, Label, Orientation, Overlay, ProgressBar, SearchBar, SearchEntry,
 };
 use webkit2gtk::traits::{
     CookieManagerExt, FindControllerExt, HitTestResultExt, NavigationPolicyDecisionExt,
@@ -53,7 +53,7 @@ impl Viewer {
         overlay.add_overlay(&progress_bar);
         overlay.set_overlay_pass_through(&progress_bar, true);
 
-        let status_bar = gtk::LabelBuilder::new()
+        let status_bar = LabelBuilder::new()
             .halign(gtk::Align::Start)
             .valign(gtk::Align::End)
             .no_show_all(true)
