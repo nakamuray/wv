@@ -159,4 +159,10 @@ impl FaviconHeaderBar {
             .get()
             .expect("Private state not initialized")
     }
+
+    pub fn select_subtitle(&self) {
+        let subtitle = &self.get_favicontitle().subtitle;
+        subtitle.set_is_focus(true);
+        subtitle.select_region(0, -1);
+    }
 }

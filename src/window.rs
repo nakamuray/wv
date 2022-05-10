@@ -424,6 +424,16 @@ impl Window {
         );
         self.application
             .set_accels_for_action("win.reload", &["<Primary>r"]);
+
+        action!(
+            self.widget,
+            "select-url",
+            glib::clone!(@weak self.header as header => move |_action, _parameter| {
+                header.select_subtitle();
+            })
+        );
+        self.application
+            .set_accels_for_action("win.select-url", &["<Primary>l"]);
     }
     pub fn load_uri(&self, uri: &str) {
         self.viewer.webview.load_uri(uri)
