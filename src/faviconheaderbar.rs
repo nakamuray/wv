@@ -1,12 +1,10 @@
+use gtk4 as gtk;
+
 use gtk::gdk_pixbuf::{InterpType, Pixbuf};
-use gtk::glib;
 use gtk::pango::EllipsizeMode;
 use gtk::prelude::*;
-use gtk::subclass::prelude::*;
-use once_cell::unsync::OnceCell;
 
 use gtk::builders::{BoxBuilder, LabelBuilder};
-use gtk::traits::{HeaderBarExt, LabelExt};
 use gtk::{Align, HeaderBar, Image, Label, Orientation};
 
 #[derive(Debug)]
@@ -35,7 +33,8 @@ impl FaviconTitle {
         let favicon = Image::new();
         favicon.style_context().add_class("favicon");
         favicon.set_halign(Align::End);
-        title_box.pack_start(&favicon, true, true, 0);
+        favicon.set_hexpand(true);
+        title_box.append(&favicon);
         let title = LabelBuilder::new()
             .wrap(false)
             .single_line_mode(true)
@@ -44,8 +43,9 @@ impl FaviconTitle {
             .halign(Align::Start)
             .build();
         title.style_context().add_class("title");
-        title_box.pack_start(&title, true, true, 0);
-        label_box.pack_start(&title_box, false, false, 0);
+        title.set_hexpand(true);
+        title_box.append(&title);
+        label_box.append(&title_box);
 
         let subtitle = LabelBuilder::new()
             .wrap(false)
@@ -55,8 +55,9 @@ impl FaviconTitle {
             .build();
         subtitle.style_context().add_class("subtitle");
         let subtitle_box = gtk::Box::new(Orientation::Horizontal, 0);
-        subtitle_box.pack_start(&subtitle, true, false, 0);
-        label_box.pack_start(&subtitle_box, false, false, 0);
+        subtitle.set_hexpand(true);
+        subtitle_box.append(&subtitle);
+        label_box.append(&subtitle_box);
 
         Self {
             widget: label_box,
@@ -68,50 +69,21 @@ impl FaviconTitle {
 }
 
 #[derive(Debug)]
-pub struct FaviconHeaderBarPriv {
-    favicontitle: OnceCell<FaviconTitle>,
-}
-
-impl Default for FaviconHeaderBarPriv {
-    fn default() -> Self {
-        Self {
-            favicontitle: OnceCell::new(),
-        }
-    }
-}
-
-#[glib::object_subclass]
-impl ObjectSubclass for FaviconHeaderBarPriv {
-    const NAME: &'static str = "FaviconHeaderBar";
-    type Type = FaviconHeaderBar;
-    type ParentType = HeaderBar;
-}
-
-impl ObjectImpl for FaviconHeaderBarPriv {
-    fn constructed(&self, obj: &Self::Type) {
-        self.parent_constructed(obj);
-
-        let favicontitle = FaviconTitle::new();
-        obj.set_custom_title(Some(&favicontitle.widget));
-
-        self.favicontitle
-            .set(favicontitle)
-            .expect("Failed to initialize private state");
-    }
-}
-
-impl HeaderBarImpl for FaviconHeaderBarPriv {}
-impl ContainerImpl for FaviconHeaderBarPriv {}
-impl WidgetImpl for FaviconHeaderBarPriv {}
-
-glib::wrapper! {
-    pub struct FaviconHeaderBar(ObjectSubclass<FaviconHeaderBarPriv>)
-        @extends gtk::HeaderBar, gtk::Container, gtk::Widget;
+pub struct FaviconHeaderBar {
+    pub widget: HeaderBar,
+    favicontitle: FaviconTitle,
 }
 
 impl FaviconHeaderBar {
     pub fn new() -> Self {
-        glib::Object::new(&[]).expect("Faled to create FaviconHeaderBar")
+        let favicontitle = FaviconTitle::new();
+        let bar = HeaderBar::builder()
+            .title_widget(&favicontitle.widget)
+            .build();
+        Self {
+            widget: bar,
+            favicontitle: favicontitle,
+        }
     }
 
     pub fn set_title(&self, title: Option<&str>) {
@@ -119,9 +91,8 @@ impl FaviconHeaderBar {
             Some(label) => (label, Some(label)),
             None => ("", None),
         };
-        let favicontitle = self.get_favicontitle();
-        favicontitle.title.set_label(label);
-        favicontitle.title.set_tooltip_text(tooltip);
+        self.favicontitle.title.set_label(label);
+        self.favicontitle.title.set_tooltip_text(tooltip);
     }
 
     pub fn set_subtitle(&self, title: Option<&str>) {
@@ -129,11 +100,11 @@ impl FaviconHeaderBar {
             Some(label) => label,
             None => "",
         };
-        self.get_favicontitle().subtitle.set_label(label);
+        self.favicontitle.subtitle.set_label(label);
     }
 
     pub fn set_favicon(&self, favicon: Option<&Pixbuf>) {
-        let favicontitle = self.get_favicontitle();
+        let favicontitle = &self.favicontitle;
 
         if let Some(favicon) = favicon {
             let scale = favicontitle.favicon.scale_factor();
@@ -152,17 +123,9 @@ impl FaviconHeaderBar {
         }
     }
 
-    fn get_favicontitle(&self) -> &FaviconTitle {
-        let priv_ = FaviconHeaderBarPriv::from_instance(self);
-        priv_
-            .favicontitle
-            .get()
-            .expect("Private state not initialized")
-    }
-
     pub fn select_subtitle(&self) {
-        let subtitle = &self.get_favicontitle().subtitle;
-        subtitle.set_is_focus(true);
+        let subtitle = &self.favicontitle.subtitle;
+        subtitle.grab_focus();
         subtitle.select_region(0, -1);
     }
 }

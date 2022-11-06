@@ -6,3 +6,10 @@ label.status-bar {
     border-color: @borders;
     border-radius: 0 8px 0 0;
 }
+
+button.menuitem {
+    padding-top: 1px;
+    padding-bottom: 1px;
+    margin-top: 0;
+    margin-bottom: 0;
+}

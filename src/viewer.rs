@@ -1,16 +1,13 @@
+use gtk4 as gtk;
+
 use gtk::prelude::*;
 
 use gtk::glib;
 use gtk::glib::clone;
 
 use gtk::builders::{LabelBuilder, ProgressBarBuilder};
-use gtk::{
-    traits::SearchBarExt, Align, Label, Orientation, Overlay, ProgressBar, SearchBar, SearchEntry,
-};
-use webkit2gtk::traits::{
-    CookieManagerExt, FindControllerExt, HitTestResultExt, NavigationPolicyDecisionExt,
-    SettingsExt, WebContextExt, WebViewExt,
-};
+use gtk::{Align, Label, Orientation, Overlay, ProgressBar, SearchBar, SearchEntry};
+use webkit2gtk::prelude::*;
 use webkit2gtk::{
     CookieAcceptPolicy, FindOptions, NavigationPolicyDecision, PolicyDecisionType, WebContext,
     WebView,
@@ -29,8 +26,10 @@ pub struct Viewer {
 impl Viewer {
     pub fn new() -> Self {
         let box_ = gtk::Box::new(Orientation::Vertical, 0);
+        box_.set_homogeneous(false);
         let overlay = Overlay::new();
-        box_.pack_start(&overlay, true, true, 0);
+        overlay.set_vexpand(true);
+        box_.prepend(&overlay);
         let context = WebContext::new_ephemeral();
         context.set_sandbox_enabled(true);
         context
@@ -42,41 +41,42 @@ impl Viewer {
         WebViewExt::settings(&webview)
             .unwrap()
             .set_enable_smooth_scrolling(true);
-        overlay.add(&webview);
+        overlay.set_child(Some(&webview));
 
         let progress_bar = ProgressBarBuilder::new()
             .halign(gtk::Align::Fill)
             .valign(gtk::Align::Start)
-            .no_show_all(true)
+            .can_target(false)
             .fraction(0.0)
             .build();
+        progress_bar.hide();
         overlay.add_overlay(&progress_bar);
-        overlay.set_overlay_pass_through(&progress_bar, true);
 
         let status_bar = LabelBuilder::new()
             .halign(gtk::Align::Start)
             .valign(gtk::Align::End)
-            .no_show_all(true)
+            .can_target(false)
             .build();
         status_bar.style_context().add_class("status-bar");
+        status_bar.hide();
         overlay.add_overlay(&status_bar);
-        overlay.set_overlay_pass_through(&status_bar, true);
 
         let search_bar = SearchBar::new();
         search_bar.set_show_close_button(true);
-        box_.pack_end(&search_bar, false, false, 0);
+        box_.append(&search_bar);
 
         let search_box = gtk::Box::new(Orientation::Horizontal, 6);
-        search_bar.add(&search_box);
+        search_bar.set_child(Some(&search_box));
 
         let search_entry = gtk::SearchEntry::new();
         search_entry.set_halign(Align::Start);
         search_bar.connect_entry(&search_entry);
-        search_box.pack_start(&search_entry, true, true, 0);
+        search_entry.set_hexpand(true);
+        search_box.prepend(&search_entry);
 
         let match_count_label = Label::new(None);
         match_count_label.set_halign(Align::End);
-        search_box.pack_end(&match_count_label, false, false, 0);
+        search_box.append(&match_count_label);
 
         let this = Self {
             widget: box_,

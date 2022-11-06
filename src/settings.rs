@@ -1,3 +1,5 @@
+use gtk4 as gtk;
+
 use gtk::gio::prelude::*;
 use gtk::gio::{Cancellable, File};
 use gtk::{gio, glib};

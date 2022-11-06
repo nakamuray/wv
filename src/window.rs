@@ -1,26 +1,27 @@
+use gtk4 as gtk;
+
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::convert::TryInto;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gtk::builders::{BoxBuilder, ModelButtonBuilder};
+use gtk::builders::BoxBuilder;
 use gtk::cairo::ImageSurface;
 use gtk::gdk::pixbuf_get_from_surface;
 use gtk::gio::{traits::AppInfoExt, AppInfo};
 use gtk::glib::{clone, GString};
-use gtk::traits::{HeaderBarExt, SearchBarExt};
 use gtk::{gio, glib};
 use gtk::{
-    Application, ApplicationWindow, Button, FileChooserAction, FileChooserDialog, IconSize, Image,
-    Label, Menu, MenuButton, MenuItem, Orientation, PopoverMenu, ResponseType,
+    gio::{File, SimpleAction},
+    Align, Application, ApplicationWindow, Button, FileChooserAction, FileChooserDialog, Image,
+    Label, MenuButton, Orientation, Popover, ResponseType,
 };
-use gtk_macros::action;
 use webkit2gtk::traits::{
     BackForwardListExt, BackForwardListItemExt, ContextMenuExt, DownloadExt, HitTestResultExt,
     URIRequestExt, WebContextExt, WebViewExt,
 };
-use webkit2gtk::{ContextMenu, ContextMenuItem, NavigationType};
+use webkit2gtk::{ContextMenu, ContextMenuItem, NavigationType, WebView};
 
 use crate::faviconheaderbar;
 use crate::settings::Settings;
@@ -30,7 +31,7 @@ pub struct Window {
     pub widget: ApplicationWindow,
     application: Application,
     pub settings: Rc<RefCell<Settings>>,
-    header: faviconheaderbar::FaviconHeaderBar,
+    header: Rc<faviconheaderbar::FaviconHeaderBar>,
     back_button: Button,
     forward_button: Button,
     reload_or_stop_button: Button,
@@ -40,52 +41,44 @@ pub struct Window {
 impl Window {
     pub fn new(app: &Application, settings: Rc<RefCell<Settings>>) -> Self {
         let win = ApplicationWindow::new(app);
-        win.set_title("Web View");
+        win.set_title(Some("Web View"));
         win.set_default_size(
             settings.borrow().window.width,
             settings.borrow().window.height,
         );
 
         let viewer = viewer::Viewer::new();
-        win.add(&viewer.widget);
+        win.set_child(Some(&viewer.widget));
 
-        let header = faviconheaderbar::FaviconHeaderBar::new();
-        header.set_show_close_button(true);
-        win.set_titlebar(Some(&header));
+        let header = Rc::new(faviconheaderbar::FaviconHeaderBar::new());
+        header.widget.set_show_title_buttons(true);
+        win.set_titlebar(Some(&header.widget));
 
         let navigation_buttons = gtk::Box::new(Orientation::Horizontal, 0);
         navigation_buttons.style_context().add_class("linked");
 
-        let back_button =
-            Button::from_icon_name(Some("go-previous-symbolic"), IconSize::SmallToolbar);
+        let back_button = Button::from_icon_name("go-previous-symbolic");
         back_button.set_sensitive(false);
         back_button.set_tooltip_text(Some("go back"));
-        navigation_buttons.pack_start(&back_button, false, false, 0);
+        navigation_buttons.append(&back_button);
 
-        let forward_button =
-            Button::from_icon_name(Some("go-next-symbolic"), IconSize::SmallToolbar);
+        let forward_button = Button::from_icon_name("go-next-symbolic");
         forward_button.set_sensitive(false);
         forward_button.set_tooltip_text(Some("go forward"));
-        navigation_buttons.pack_start(&forward_button, false, false, 0);
+        navigation_buttons.append(&forward_button);
 
-        header.pack_start(&navigation_buttons);
+        header.widget.pack_start(&navigation_buttons);
 
-        let reload_or_stop_button = Button::from_icon_name(
-            Some("emblem-synchronizing-symbolic"),
-            IconSize::SmallToolbar,
-        );
+        let reload_or_stop_button = Button::from_icon_name("view-refresh-symbolic");
         reload_or_stop_button.set_tooltip_text(Some("reload"));
-        header.pack_start(&reload_or_stop_button);
+        header.widget.pack_start(&reload_or_stop_button);
 
         let menu_button = MenuButton::new();
-        menu_button.set_image(Some(&Image::from_icon_name(
-            Some("document-send-symbolic"),
-            IconSize::SmallToolbar,
-        )));
+        menu_button.set_icon_name("document-send-symbolic");
         menu_button.set_tooltip_text(Some("re-open page with ..."));
-        header.pack_end(&menu_button);
+        header.widget.pack_end(&menu_button);
 
-        let menu_popover = PopoverMenu::new();
+        let menu_popover = Popover::new();
         menu_button.set_popover(Some(&menu_popover));
 
         let menu_box = BoxBuilder::new()
@@ -96,10 +89,10 @@ impl Window {
             .margin_start(10)
             .margin_end(10)
             .build();
-        menu_popover.add(&menu_box);
+        menu_popover.set_child(Some(&menu_box));
 
         let label = Label::new(Some("Re-Open Page with ..."));
-        menu_box.pack_start(&label, false, false, 0);
+        menu_box.append(&label);
 
         let browsers = AppInfo::recommended_for_type("x-scheme-handler/http");
         for info in browsers.iter() {
@@ -107,29 +100,29 @@ impl Window {
                 // skip myself
                 continue;
             };
-            let button = ModelButtonBuilder::new()
-                .always_show_image(true)
-                .image(&Image::from_gicon(
-                    &info.icon().unwrap(),
-                    IconSize::SmallToolbar,
-                ))
-                .label(&info.name())
-                .halign(gtk::Align::Start)
+            let hbox = gtk::Box::new(Orientation::Horizontal, 4);
+            hbox.prepend(&Image::from_gicon(&info.icon().unwrap()));
+            hbox.append(&Label::new(Some(&info.name())));
+            let button = Button::builder()
+                .has_frame(false)
+                .child(&hbox)
+                .halign(Align::Start)
+                .hexpand(true)
                 .build();
-            menu_box.pack_start(&button, false, false, 0);
+            button.style_context().add_class("menuitem");
+            menu_box.append(&button);
 
             button.connect_clicked(
-                clone!(@strong info, @weak viewer.webview as webview => move |_button| {
+                clone!(@strong info, @weak viewer.webview as webview, @weak menu_popover => move |_button| {
                     if let Some(uri) = webview.uri() {
                         if let Err(e) = info.launch_uris(&[&uri], gio::AppLaunchContext::NONE) {
                             eprintln!("{:?}", e);
                         }
                     }
+                    menu_popover.popdown();
                 }),
             );
         }
-
-        menu_box.show_all();
 
         let this = Self {
             widget: win,
@@ -146,9 +139,18 @@ impl Window {
         this
     }
     fn connect_signals(&self) {
-        self.widget.connect_size_allocate(
-            glib::clone!(@strong self.settings as settings => move |win, _rect| {
-                let (width, height) = win.size();
+        self.widget.connect_default_height_notify(
+            glib::clone!(@strong self.settings as settings => move |win| {
+                let height = win.size(Orientation::Vertical);
+                let width = win.size(Orientation::Horizontal);
+                (*settings.borrow_mut()).window.height = height;
+                (*settings.borrow_mut()).window.width = width;
+            }),
+        );
+        self.widget.connect_default_width_notify(
+            glib::clone!(@strong self.settings as settings => move |win| {
+                let height = win.size(Orientation::Vertical);
+                let width = win.size(Orientation::Horizontal);
                 (*settings.borrow_mut()).window.height = height;
                 (*settings.borrow_mut()).window.width = width;
             }),
@@ -170,12 +172,12 @@ impl Window {
                         let action = gio::SimpleAction::new(&info.id().unwrap(), None);
                         let name = info.name();
                         action.connect_activate(
-                    glib::clone!(@strong info, @strong uri => move |_action, _parameter| {
-                        if let Err(e) = info.launch_uris(&[&uri], gio::AppLaunchContext::NONE) {
-                            eprintln!("{:?}", e);
-                        }
-                    }),
-                );
+                            glib::clone!(@strong info, @strong uri => move |_action, _parameter| {
+                                if let Err(e) = info.launch_uris(&[&uri], gio::AppLaunchContext::NONE) {
+                                    eprintln!("{:?}", e);
+                                }
+                            }),
+                        );
                         let item = webkit2gtk::ContextMenuItem::from_gaction(&action, &name, None);
                         open_link_menu.append(&item);
                     }
@@ -203,16 +205,16 @@ impl Window {
             }
 
             if webview.is_loading() {
-                reload_or_stop_button.set_image(Some(&Image::from_icon_name(Some("process-stop-symbolic"), IconSize::SmallToolbar)));
+                reload_or_stop_button.set_icon_name("process-stop-symbolic");
                 reload_or_stop_button.set_tooltip_text(Some("stop"));
             } else {
-                reload_or_stop_button.set_image(Some(&Image::from_icon_name(Some("emblem-synchronizing-symbolic"), IconSize::SmallToolbar)));
+                reload_or_stop_button.set_icon_name("view-refresh-symbolic");
                 reload_or_stop_button.set_tooltip_text(Some("reload"));
             }
         }));
 
         self.viewer.webview.connect_title_notify(
-            glib::clone!(@weak self.header as header => move |webview| {
+            glib::clone!(@strong self.header as header => move |webview| {
                 if let Some(title) = webview.title() {
                     header.set_title(Some(&title));
                 } else {
@@ -222,7 +224,7 @@ impl Window {
         );
 
         self.viewer.webview.connect_uri_notify(
-            glib::clone!(@weak self.header as header => move |webview| {
+            glib::clone!(@strong self.header as header => move |webview| {
                 if let Some(uri) = webview.uri() {
                     header.set_subtitle(Some(uri.as_str()));
                 } else {
@@ -232,7 +234,7 @@ impl Window {
         );
 
         self.viewer.webview.connect_favicon_notify(
-            glib::clone!(@weak self.header as header => move |webview| {
+            glib::clone!(@strong self.header as header => move |webview| {
                 if let Some(surface) = webview.favicon() {
                     let image_surface: ImageSurface = surface.try_into().expect("image surface expected");
                     let width = image_surface.width();
@@ -249,21 +251,25 @@ impl Window {
         self.viewer.webview.context().unwrap().connect_download_started(glib::clone!(
                 @weak self.widget as window => move |_context, download| {
             download.connect_decide_destination(move |download, suggested_filename| {
-                let dialog = FileChooserDialog::with_buttons(Some("Download File"), Some(&window), FileChooserAction::Save, &[("_Cancel", ResponseType::Cancel), ("_Save", ResponseType::Accept)]);
+                let dialog = FileChooserDialog::new(Some("Download File"), Some(&window), FileChooserAction::Save, &[("_Cancel", ResponseType::Cancel), ("_Save", ResponseType::Accept)]);
                 dialog.set_default_response(ResponseType::Accept);
-                dialog.set_do_overwrite_confirmation(true);
                 if let Some(download_folder) = glib::user_special_dir(glib::UserDirectory::Downloads) {
-                    dialog.set_current_folder(&download_folder);
+                    // do nothing if failed to change directory
+                    let _ = dialog.set_current_folder(Some(&File::for_path(&download_folder)));
                 }
                 dialog.set_current_name(&suggested_filename);
-                let res = dialog.run();
-                if res == gtk::ResponseType::Accept {
-                    let filename = dialog.uri().unwrap();
-                    download.set_destination(&filename);
-                } else {
-                    download.cancel();
-                }
-                dialog.close();
+                let download = download.clone();
+                dialog.connect_response(move |dialog, response| {
+                    if response == gtk::ResponseType::Accept {
+                        let file = dialog.file().expect("accepted dialog should have file");
+                        let filename = file.uri();
+                        download.set_destination(&filename);
+                    } else {
+                        download.cancel();
+                    }
+                    dialog.close();
+                });
+                dialog.show();
                 false
             });
         }));
@@ -276,7 +282,7 @@ impl Window {
                     if let Some(uri) = req.uri() {
                         // action from "Open Link in New Window" context menu (maybe)
                         let win = Window::new(&app, settings.clone());
-                        win.widget.show_all();
+                        win.widget.show();
                         win.load_uri(&uri);
                     }
                 }
@@ -312,55 +318,38 @@ impl Window {
                 webview.grab_focus();
             }),
         );
-        self.back_button.connect_button_press_event(glib::clone!(
-                @weak self.viewer.webview as webview => @default-return Inhibit(false), move |_back_button, event| {
-            match (event.button(), webview.back_forward_list()) {
-                (3, Some(back_forward_list)) => {
-                    let menu = Menu::new();
-                    for back in back_forward_list.back_list() {
-                        let item = MenuItem::new();
-                        item.set_label(&back.title().unwrap_or(GString::from("(no title)")));
-                        item.connect_activate(glib::clone!(@weak webview => move |_item| {
-                            webview.go_to_back_forward_list_item(&back);
-                            webview.grab_focus();
-                        }));
-                        menu.add(&item);
-                    }
-                    menu.show_all();
-                    menu.popup_at_pointer(Some(&event));
-                    Inhibit(true)
-                },
-                _ => Inhibit(false)
+        let back_button_right_pressed = gtk::GestureClick::new();
+        // right mouse button
+        back_button_right_pressed.set_button(3);
+        back_button_right_pressed.connect_pressed(glib::clone!(
+                @weak self.viewer.webview as webview,
+                @weak self.back_button as back_button => move |_gesture, _n, _x, _y| {
+            if let Some(popover) = build_history_popover(&webview, HistoryDirection::Back) {
+                popover.set_parent(&back_button);
+                popover.popup();
             }
         }));
+        self.back_button.add_controller(&back_button_right_pressed);
+
         self.forward_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
                 webview.go_forward();
                 webview.grab_focus();
             }),
         );
-        self.forward_button.connect_button_press_event(glib::clone!(
-                @weak self.viewer.webview as webview => @default-return Inhibit(false), move |_forward_button, event| {
-            match (event.button(), webview.back_forward_list()) {
-                (3, Some(back_forward_list)) => {
-                    let menu = Menu::new();
-                    // put list items in reverse order
-                    for forward in back_forward_list.forward_list().iter().rev() {
-                        let item = MenuItem::new();
-                        item.set_label(&forward.title().unwrap_or(GString::from("(no title)")));
-                        item.connect_activate(glib::clone!(@weak webview, @weak forward => move |_item| {
-                            webview.go_to_back_forward_list_item(&forward);
-                            webview.grab_focus();
-                        }));
-                        menu.add(&item);
-                    }
-                    menu.show_all();
-                    menu.popup_at_pointer(Some(&event));
-                    Inhibit(true)
-                },
-                _ => Inhibit(false)
+        let forward_button_right_pressed = gtk::GestureClick::new();
+        // right mouse button
+        forward_button_right_pressed.set_button(3);
+        forward_button_right_pressed.connect_pressed(glib::clone!(
+                @weak self.viewer.webview as webview,
+                @weak self.forward_button as forward_button => move |_gesture, _n, _x, _y| {
+            if let Some(popover) = build_history_popover(&webview, HistoryDirection::Forward) {
+                popover.set_parent(&forward_button);
+                popover.popup();
             }
         }));
+        self.forward_button
+            .add_controller(&forward_button_right_pressed);
         self.reload_or_stop_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
                 if webview.is_loading() {
@@ -373,69 +362,129 @@ impl Window {
         );
     }
     fn setup_accels(&self) {
-        action!(
-            self.widget,
-            "close",
+        let close_action = SimpleAction::new("close", None);
+        close_action.connect_activate(
             glib::clone!(@weak self.widget as window => move |_action, _parameter| {
                 window.close();
-            })
+            }),
         );
+        self.widget.add_action(&close_action);
         self.application
             .set_accels_for_action("win.close", &["<Primary>w"]);
 
-        action!(
-            self.widget,
-            "find",
+        let find_action = SimpleAction::new("find", None);
+        find_action.connect_activate(
             glib::clone!(@weak self.viewer.search_bar as search_bar => move |_action, _parameter| {
                 if !search_bar.is_search_mode() {
                     search_bar.set_search_mode(true);
                 }
-            })
+            }),
         );
+        self.widget.add_action(&find_action);
         self.application
             .set_accels_for_action("win.find", &["<Primary>f"]);
 
-        action!(
-            self.widget,
-            "back",
+        let back_action = SimpleAction::new("back", None);
+        back_action.connect_activate(
             glib::clone!(@weak self.viewer.webview as webview => move |_action, _parameter| {
                 webview.go_back();
-            })
+            }),
         );
+        self.widget.add_action(&back_action);
         self.application
             .set_accels_for_action("win.back", &["<alt>Left"]);
 
-        action!(
-            self.widget,
-            "forward",
+        let forward_action = SimpleAction::new("forward", None);
+        forward_action.connect_activate(
             glib::clone!(@weak self.viewer.webview as webview => move |_action, _parameter| {
                 webview.go_forward();
-            })
+            }),
         );
+        self.widget.add_action(&forward_action);
         self.application
             .set_accels_for_action("win.forward", &["<alt>Right"]);
 
-        action!(
-            self.widget,
-            "reload",
+        let reload_action = SimpleAction::new("reload", None);
+        reload_action.connect_activate(
             glib::clone!(@weak self.viewer.webview as webview => move |_action, _parameter| {
                 webview.reload();
-            })
+            }),
         );
+        self.widget.add_action(&reload_action);
         self.application
             .set_accels_for_action("win.reload", &["<Primary>r"]);
 
-        action!(
-            self.widget,
-            "select-url",
+        let selecturl_action = SimpleAction::new("select-url", None);
+        selecturl_action.connect_activate(
             glib::clone!(@weak self.header as header => move |_action, _parameter| {
                 header.select_subtitle();
-            })
+            }),
         );
+        self.widget.add_action(&selecturl_action);
         self.application
             .set_accels_for_action("win.select-url", &["<Primary>l"]);
     }
     pub fn load_uri(&self, uri: &str) {
         self.viewer.webview.load_uri(uri)
     }
+}
+
+enum HistoryDirection {
+    Back,
+    Forward,
+}
+
+fn build_history_popover(webview: &WebView, direction: HistoryDirection) -> Option<Popover> {
+    let back_forward_list = webview.back_forward_list()?;
+
+    let popover = Popover::new();
+    let menu_box = BoxBuilder::new()
+        .orientation(Orientation::Vertical)
+        .spacing(0)
+        .margin_top(10)
+        .margin_bottom(10)
+        .margin_start(10)
+        .margin_end(10)
+        .build();
+    popover.set_child(Some(&menu_box));
+    popover.connect_closed(|menu| {
+        // to destroy this menu, unparent it
+        menu.unparent();
+    });
+
+    let list = match direction {
+        HistoryDirection::Back => back_forward_list.back_list(),
+        HistoryDirection::Forward => back_forward_list.forward_list(),
+    };
+    for item in list {
+        let label = Label::builder()
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .max_width_chars(48)
+            .single_line_mode(true)
+            .xalign(0.0)
+            .hexpand(true)
+            .build();
+        if let Some(title) = &item.title() {
+            label.set_text(title);
+        } else {
+            label.set_text(&item.uri().unwrap_or(GString::from("(no title)")));
+        }
+        let button = Button::builder()
+            .has_frame(false)
+            .halign(Align::Fill)
+            .hexpand(true)
+            .build();
+        button.set_child(Some(&label));
+        button.style_context().add_class("menuitem");
+        button.connect_clicked(
+            glib::clone!(@weak webview, @weak popover => move |_button| {
+                popover.popdown();
+                webview.go_to_back_forward_list_item(&item);
+                webview.grab_focus();
+            }),
+        );
+        menu_box.append(&button);
+    }
+
+    Some(popover)
 }
