@@ -4,7 +4,6 @@ use gtk::gdk_pixbuf::{InterpType, Pixbuf};
 use gtk::pango::EllipsizeMode;
 use gtk::prelude::*;
 
-use gtk::builders::{BoxBuilder, LabelBuilder};
 use gtk::{Align, HeaderBar, Image, Label, Orientation};
 
 #[derive(Debug)]
@@ -20,13 +19,13 @@ const FAVICON_SIZE: i32 = 16;
 
 impl FaviconTitle {
     fn new() -> Self {
-        let label_box = BoxBuilder::new()
+        let label_box = gtk::Box::builder()
             .orientation(Orientation::Vertical)
             .spacing(0)
             .valign(Align::Center)
             .build();
 
-        let title_box = BoxBuilder::new()
+        let title_box = gtk::Box::builder()
             .orientation(Orientation::Horizontal)
             .spacing(0)
             .build();
@@ -35,7 +34,7 @@ impl FaviconTitle {
         favicon.set_halign(Align::End);
         favicon.set_hexpand(true);
         title_box.append(&favicon);
-        let title = LabelBuilder::new()
+        let title = Label::builder()
             .wrap(false)
             .single_line_mode(true)
             .ellipsize(EllipsizeMode::End)
@@ -47,7 +46,7 @@ impl FaviconTitle {
         title_box.append(&title);
         label_box.append(&title_box);
 
-        let subtitle = LabelBuilder::new()
+        let subtitle = Label::builder()
             .wrap(false)
             .single_line_mode(true)
             .ellipsize(EllipsizeMode::End)

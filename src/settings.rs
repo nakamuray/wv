@@ -48,10 +48,15 @@ pub fn load_settings() -> Settings {
         settings_path.push(SETTINGS_FILE_NAME);
         let settings_file = File::for_path(settings_path);
         if let Ok((data, _)) = settings_file.load_contents(Cancellable::NONE) {
-            match toml::from_slice(&data) {
-                Ok(settings) => {
-                    return settings;
-                }
+            match std::str::from_utf8(&data) {
+                Ok(s) => match toml::from_str(&s) {
+                    Ok(settings) => {
+                        return settings;
+                    }
+                    Err(e) => {
+                        dbg!(&e);
+                    }
+                },
                 Err(e) => {
                     dbg!(&e);
                 }
@@ -78,10 +83,10 @@ pub fn save_settings(settings: &Settings) {
                 });
         }
         settings_path.push(SETTINGS_FILE_NAME);
-        let settings_data = toml::to_vec(settings).unwrap();
+        let settings_data = toml::to_string(settings).unwrap();
         let settings_file = gio::File::for_path(settings_path);
         if let Err(e) = settings_file.replace_contents(
-            &settings_data,
+            settings_data.as_bytes(),
             None,
             false,
             gio::FileCreateFlags::NONE,

@@ -6,7 +6,6 @@ use std::convert::TryInto;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gtk::builders::BoxBuilder;
 use gtk::cairo::ImageSurface;
 use gtk::gdk::pixbuf_get_from_surface;
 use gtk::gio::{traits::AppInfoExt, AppInfo};
@@ -81,7 +80,7 @@ impl Window {
         let menu_popover = Popover::new();
         menu_button.set_popover(Some(&menu_popover));
 
-        let menu_box = BoxBuilder::new()
+        let menu_box = gtk::Box::builder()
             .orientation(Orientation::Vertical)
             .spacing(0)
             .margin_top(10)
@@ -329,7 +328,7 @@ impl Window {
                 popover.popup();
             }
         }));
-        self.back_button.add_controller(&back_button_right_pressed);
+        self.back_button.add_controller(back_button_right_pressed);
 
         self.forward_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
@@ -349,7 +348,7 @@ impl Window {
             }
         }));
         self.forward_button
-            .add_controller(&forward_button_right_pressed);
+            .add_controller(forward_button_right_pressed);
         self.reload_or_stop_button.connect_clicked(
             glib::clone!(@weak self.viewer.webview as webview => move |_button| {
                 if webview.is_loading() {
@@ -438,7 +437,7 @@ fn build_history_popover(webview: &WebView, direction: HistoryDirection) -> Opti
     let back_forward_list = webview.back_forward_list()?;
 
     let popover = Popover::new();
-    let menu_box = BoxBuilder::new()
+    let menu_box = gtk::Box::builder()
         .orientation(Orientation::Vertical)
         .spacing(0)
         .margin_top(10)

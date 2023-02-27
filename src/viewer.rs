@@ -5,7 +5,6 @@ use gtk::prelude::*;
 use gtk::glib;
 use gtk::glib::clone;
 
-use gtk::builders::{LabelBuilder, ProgressBarBuilder};
 use gtk::{Align, Label, Orientation, Overlay, ProgressBar, SearchBar, SearchEntry};
 use webkit2gtk::prelude::*;
 use webkit2gtk::{
@@ -43,7 +42,7 @@ impl Viewer {
             .set_enable_smooth_scrolling(true);
         overlay.set_child(Some(&webview));
 
-        let progress_bar = ProgressBarBuilder::new()
+        let progress_bar = ProgressBar::builder()
             .halign(gtk::Align::Fill)
             .valign(gtk::Align::Start)
             .can_target(false)
@@ -52,7 +51,7 @@ impl Viewer {
         progress_bar.hide();
         overlay.add_overlay(&progress_bar);
 
-        let status_bar = LabelBuilder::new()
+        let status_bar = Label::builder()
             .halign(gtk::Align::Start)
             .valign(gtk::Align::End)
             .can_target(false)
