@@ -100,7 +100,9 @@ impl Window {
                 continue;
             };
             let hbox = gtk::Box::new(Orientation::Horizontal, 4);
-            hbox.prepend(&Image::from_gicon(&info.icon().unwrap()));
+            if let Some(icon) = info.icon() {
+                hbox.prepend(&Image::from_gicon(&icon));
+            }
             hbox.append(&Label::new(Some(&info.name())));
             let button = Button::builder()
                 .has_frame(false)
