@@ -6,9 +6,9 @@ use gtk::glib;
 use gtk::glib::clone;
 
 use gtk::{Align, Label, Orientation, Overlay, ProgressBar, SearchBar, SearchEntry};
-use webkit2gtk::prelude::*;
-use webkit2gtk::{
-    CookieAcceptPolicy, FindOptions, NavigationPolicyDecision, PolicyDecisionType, WebContext,
+use webkit6::prelude::*;
+use webkit6::{
+    CookieAcceptPolicy, FindOptions, NavigationPolicyDecision, NetworkSession, PolicyDecisionType,
     WebView,
 };
 
@@ -29,14 +29,19 @@ impl Viewer {
         let overlay = Overlay::new();
         overlay.set_vexpand(true);
         box_.prepend(&overlay);
-        let context = WebContext::new_ephemeral();
-        context.set_sandbox_enabled(true);
-        context
+
+        let network_session = NetworkSession::new_ephemeral();
+        network_session
             .cookie_manager()
             .unwrap()
             .set_accept_policy(CookieAcceptPolicy::NoThirdParty);
-        context.set_favicon_database_directory(None);
-        let webview = WebView::with_context(&context);
+        network_session.set_itp_enabled(true);
+        if let Some(website_data_manager) = network_session.website_data_manager() {
+            website_data_manager.set_favicons_enabled(true);
+        }
+        let webview = glib::object::Object::builder()
+            .property("network-session", network_session)
+            .build();
         WebViewExt::settings(&webview)
             .unwrap()
             .set_enable_smooth_scrolling(true);
@@ -101,7 +106,7 @@ impl Viewer {
         }));
         self.webview.connect_load_changed(glib::clone!(
             @weak self.progress_bar as progress_bar => move |_webview, event| {
-                if event == webkit2gtk::LoadEvent::Finished {
+                if event == webkit6::LoadEvent::Finished {
                     progress_bar.hide();
                 }
         }));
@@ -123,7 +128,7 @@ impl Viewer {
                     PolicyDecisionType::NewWindowAction => {
                         let navigation_decision: &NavigationPolicyDecision =
                             decision.downcast_ref().unwrap();
-                        let action = navigation_decision.navigation_action().unwrap();
+                        let mut action = navigation_decision.navigation_action().unwrap();
                         let request = action.request().unwrap();
                         // open link in this window, not new window
                         webview.load_request(&request);

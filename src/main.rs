@@ -21,7 +21,7 @@ fn main() {
         let display = gdk::Display::default().expect("can't get display");
         let provider = gtk::CssProvider::new();
         provider.load_from_data(include_str!("css/style.css"));
-        gtk::StyleContext::add_provider_for_display(
+        gtk::style_context_add_provider_for_display(
             &display,
             &provider,
             gtk::STYLE_PROVIDER_PRIORITY_USER,

@@ -2,12 +2,9 @@ use gtk4 as gtk;
 
 use gtk::prelude::*;
 use std::cell::RefCell;
-use std::convert::TryInto;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gtk::cairo::ImageSurface;
-use gtk::gdk::pixbuf_get_from_surface;
 use gtk::gio::{traits::AppInfoExt, AppInfo};
 use gtk::glib::{clone, GString};
 use gtk::{gio, glib};
@@ -16,11 +13,8 @@ use gtk::{
     Align, Application, ApplicationWindow, Button, FileChooserAction, FileChooserDialog, Image,
     Label, MenuButton, Orientation, Popover, ResponseType,
 };
-use webkit2gtk::traits::{
-    BackForwardListExt, BackForwardListItemExt, ContextMenuExt, DownloadExt, HitTestResultExt,
-    URIRequestExt, WebContextExt, WebViewExt,
-};
-use webkit2gtk::{ContextMenu, ContextMenuItem, NavigationType, WebView};
+use webkit6::prelude::*;
+use webkit6::{ContextMenu, ContextMenuItem, NavigationType, WebView};
 
 use crate::faviconheaderbar;
 use crate::settings::Settings;
@@ -158,7 +152,7 @@ impl Window {
         );
 
         self.viewer.webview.connect_context_menu(
-            |_webview, context_menu, _event, hit_test_result| {
+            |_webview, context_menu, hit_test_result| {
                 if hit_test_result.context_is_link() {
                     let uri = hit_test_result.link_uri().unwrap().to_string();
 
@@ -179,7 +173,7 @@ impl Window {
                                 }
                             }),
                         );
-                        let item = webkit2gtk::ContextMenuItem::from_gaction(&action, &name, None);
+                        let item = webkit6::ContextMenuItem::from_gaction(&action, &name, None);
                         open_link_menu.append(&item);
                     }
                     let open_link_item =
@@ -237,19 +231,18 @@ impl Window {
         self.viewer.webview.connect_favicon_notify(
             glib::clone!(@strong self.header as header => move |webview| {
                 if let Some(surface) = webview.favicon() {
-                    let image_surface: ImageSurface = surface.try_into().expect("image surface expected");
-                    let width = image_surface.width();
-                    let height = image_surface.height();
-                    let pixbuf = pixbuf_get_from_surface(&image_surface, 0, 0, width, height).unwrap();
-
-                    header.set_favicon(Some(&pixbuf));
+                    if let Some(pixbuf) = gtk::gdk::pixbuf_get_from_texture(&surface) {
+                        header.set_favicon(Some(&pixbuf));
+                    } else {
+                        header.set_favicon(None);
+                    }
                 } else {
                     header.set_favicon(None);
                 }
             }),
         );
 
-        self.viewer.webview.context().unwrap().connect_download_started(glib::clone!(
+        self.viewer.webview.network_session().unwrap().connect_download_started(glib::clone!(
                 @weak self.widget as window => move |_context, download| {
             download.connect_decide_destination(move |download, suggested_filename| {
                 let dialog = FileChooserDialog::new(Some("Download File"), Some(&window), FileChooserAction::Save, &[("_Cancel", ResponseType::Cancel), ("_Save", ResponseType::Accept)]);
@@ -276,8 +269,10 @@ impl Window {
         }));
 
         self.viewer.webview.connect_create(glib::clone!(
-                @weak self.application as app,
-                @strong self.settings as settings => @default-return None, move |_webview, navigation_action| {
+                @strong self.application as app,
+                @strong self.settings as settings => move |webview, navigation_action| {
+            // XXX: why navigation_action.navigation_type() require &mut?
+            let mut navigation_action = navigation_action.clone();
             if navigation_action.navigation_type() == NavigationType::Other {
                 if let Some(req) = navigation_action.request() {
                     if let Some(uri) = req.uri() {
@@ -285,10 +280,11 @@ impl Window {
                         let win = Window::new(&app, settings.clone());
                         win.widget.show();
                         win.load_uri(&uri);
+                        return win.viewer.webview.into();
                     }
                 }
             }
-            None
+            webview.clone().into()
         }));
 
         // XXX: until BackForwardListExt::connect_changed is implemented,
