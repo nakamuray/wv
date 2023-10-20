@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gtk::gio::{traits::AppInfoExt, AppInfo};
-use gtk::glib::{clone, GString};
+use gtk::glib::{clone, ControlFlow, GString};
 use gtk::{gio, glib};
 use gtk::{
     gio::{File, SimpleAction},
@@ -294,7 +294,7 @@ impl Window {
             glib::clone!(
                     @weak self.viewer.webview as webview,
                     @weak self.back_button as back_button,
-                    @weak self.forward_button as forward_button => @default-return glib::Continue(false), move || {
+                    @weak self.forward_button as forward_button => @default-return ControlFlow::Break, move || {
                 if webview.can_go_back() {
                     back_button.set_sensitive(true);
                 } else {
@@ -305,7 +305,7 @@ impl Window {
                 } else {
                     forward_button.set_sensitive(false);
                 }
-                glib::Continue(true)
+                ControlFlow::Continue
             }),
         );
 
