@@ -23,25 +23,30 @@ pub struct Viewer {
 }
 
 impl Viewer {
-    pub fn new() -> Self {
+    pub fn new(related_view: Option<&WebView>) -> Self {
         let box_ = gtk::Box::new(Orientation::Vertical, 0);
         box_.set_homogeneous(false);
         let overlay = Overlay::new();
         overlay.set_vexpand(true);
         box_.prepend(&overlay);
 
-        let network_session = NetworkSession::new_ephemeral();
-        network_session
-            .cookie_manager()
-            .unwrap()
-            .set_accept_policy(CookieAcceptPolicy::NoThirdParty);
-        network_session.set_itp_enabled(true);
-        if let Some(website_data_manager) = network_session.website_data_manager() {
-            website_data_manager.set_favicons_enabled(true);
+        let mut builder = glib::object::Object::builder();
+        if let Some(related_view) = related_view {
+            builder = builder.property("related-view", related_view);
+        } else {
+            let network_session = NetworkSession::new_ephemeral();
+            network_session
+                .cookie_manager()
+                .unwrap()
+                .set_accept_policy(CookieAcceptPolicy::NoThirdParty);
+            network_session.set_itp_enabled(true);
+            if let Some(website_data_manager) = network_session.website_data_manager() {
+                website_data_manager.set_favicons_enabled(true);
+            }
+
+            builder = builder.property("network-session", network_session);
         }
-        let webview = glib::object::Object::builder()
-            .property("network-session", network_session)
-            .build();
+        let webview = builder.build();
         WebViewExt::settings(&webview)
             .unwrap()
             .set_enable_smooth_scrolling(true);

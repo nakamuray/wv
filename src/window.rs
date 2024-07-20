@@ -31,7 +31,11 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(app: &Application, settings: Rc<RefCell<Settings>>) -> Self {
+    pub fn new(
+        app: &Application,
+        settings: Rc<RefCell<Settings>>,
+        related_view: Option<&WebView>,
+    ) -> Self {
         let win = ApplicationWindow::new(app);
         win.set_title(Some("Web View"));
         win.set_default_size(
@@ -39,7 +43,7 @@ impl Window {
             settings.borrow().window.height,
         );
 
-        let viewer = viewer::Viewer::new();
+        let viewer = viewer::Viewer::new(related_view);
         win.set_child(Some(&viewer.widget));
 
         let header = Rc::new(faviconheaderbar::FaviconHeaderBar::new());
@@ -317,11 +321,16 @@ impl Window {
                 let mut navigation_action = navigation_action.clone();
                 if navigation_action.navigation_type() == NavigationType::Other {
                     if let Some(req) = navigation_action.request() {
-                        if let Some(uri) = req.uri() {
+                        if let Some(_uri) = req.uri() {
                             // action from "Open Link in New Window" context menu (maybe)
-                            let win = Window::new(&app, settings.clone());
-                            win.widget.present();
-                            win.load_uri(&uri);
+                            let win = Window::new(&app, settings.clone(), Some(&webview));
+                            win.viewer.webview.connect_ready_to_show(glib::clone!(
+                                #[weak(rename_to = window)]
+                                win.widget,
+                                move |_webview| {
+                                    window.present();
+                                }
+                            ));
                             return win.viewer.webview.into();
                         }
                     }
