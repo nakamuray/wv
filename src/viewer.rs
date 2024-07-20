@@ -53,7 +53,7 @@ impl Viewer {
             .can_target(false)
             .fraction(0.0)
             .build();
-        progress_bar.hide();
+        progress_bar.set_visible(false);
         overlay.add_overlay(&progress_bar);
 
         let status_bar = Label::builder()
@@ -61,8 +61,8 @@ impl Viewer {
             .valign(gtk::Align::End)
             .can_target(false)
             .build();
-        status_bar.style_context().add_class("status-bar");
-        status_bar.hide();
+        status_bar.add_css_class("status-bar");
+        status_bar.set_visible(false);
         overlay.add_overlay(&status_bar);
 
         let search_bar = SearchBar::new();
@@ -96,31 +96,39 @@ impl Viewer {
     }
     fn setup_callbacks(&self) {
         self.webview.connect_estimated_load_progress_notify(clone!(
-        @weak self.progress_bar as progress_bar => move |webview| {
-            if webview.is_loading() {
-                progress_bar.show();
-                progress_bar.set_fraction(webview.estimated_load_progress());
-            } else {
-                progress_bar.hide();
-            }
-        }));
-        self.webview.connect_load_changed(glib::clone!(
-            @weak self.progress_bar as progress_bar => move |_webview, event| {
-                if event == webkit6::LoadEvent::Finished {
-                    progress_bar.hide();
+            #[weak(rename_to = progress_bar)]
+            self.progress_bar,
+            move |webview| {
+                if webview.is_loading() {
+                    progress_bar.set_visible(true);
+                    progress_bar.set_fraction(webview.estimated_load_progress());
+                } else {
+                    progress_bar.set_visible(false);
                 }
-        }));
+            }
+        ));
+        self.webview.connect_load_changed(glib::clone!(
+            #[weak(rename_to = progress_bar)]
+            self.progress_bar,
+            move |_webview, event| {
+                if event == webkit6::LoadEvent::Finished {
+                    progress_bar.set_visible(false);
+                }
+            }
+        ));
 
-        self.webview.connect_mouse_target_changed(
-            glib::clone!(@weak self.status_bar as status_bar => move |_webview, hit_test_result, _modofiers| {
+        self.webview.connect_mouse_target_changed(glib::clone!(
+            #[weak(rename_to = status_bar)]
+            self.status_bar,
+            move |_webview, hit_test_result, _modofiers| {
                 if hit_test_result.context_is_link() {
                     status_bar.set_label(&hit_test_result.link_uri().unwrap());
-                    status_bar.show();
+                    status_bar.set_visible(true);
                 } else {
-                    status_bar.hide();
+                    status_bar.set_visible(false);
                 }
-            }),
-        );
+            }
+        ));
 
         self.webview
             .connect_decide_policy(|webview, decision, decision_type| {
@@ -139,24 +147,46 @@ impl Viewer {
             });
 
         let find_controller = self.webview.find_controller().unwrap();
-        self.search_entry.connect_activate(glib::clone!(@weak find_controller => move |search_entry| {
-            let search_text = search_entry.text();
-            match find_controller.search_text() {
-                Some(s) if s == search_text => {
-                    find_controller.search_next();
-                },
-                _ => {
-                    find_controller.count_matches(&search_text, (FindOptions::WRAP_AROUND & FindOptions::CASE_INSENSITIVE).bits(), std::u32::MAX);
-                    find_controller.search(&search_text, (FindOptions::WRAP_AROUND & FindOptions::CASE_INSENSITIVE).bits(), std::u32::MAX);
+        self.search_entry.connect_activate(glib::clone!(
+            #[weak]
+            find_controller,
+            move |search_entry| {
+                let search_text = search_entry.text();
+                match find_controller.search_text() {
+                    Some(s) if s == search_text => {
+                        find_controller.search_next();
+                    }
+                    _ => {
+                        find_controller.count_matches(
+                            &search_text,
+                            (FindOptions::WRAP_AROUND & FindOptions::CASE_INSENSITIVE).bits(),
+                            std::u32::MAX,
+                        );
+                        find_controller.search(
+                            &search_text,
+                            (FindOptions::WRAP_AROUND & FindOptions::CASE_INSENSITIVE).bits(),
+                            std::u32::MAX,
+                        );
+                    }
                 }
             }
-        }));
-        self.search_entry.connect_stop_search(glib::clone!(@weak find_controller, @weak self.match_count_label as match_count_label => move |_search_entry| {
-            match_count_label.set_label("");
-            find_controller.search_finish();
-        }));
-        find_controller.connect_counted_matches(glib::clone!(@weak self.match_count_label as match_count_label => move |_find_controller, match_count| {
-            match_count_label.set_label(&format!("{} matches", match_count));
-        }));
+        ));
+        self.search_entry.connect_stop_search(glib::clone!(
+            #[weak]
+            find_controller,
+            #[weak(rename_to = match_count_label)]
+            self.match_count_label,
+            move |_search_entry| {
+                match_count_label.set_label("");
+                find_controller.search_finish();
+            }
+        ));
+        find_controller.connect_counted_matches(glib::clone!(
+            #[weak(rename_to = match_count_label)]
+            self.match_count_label,
+            move |_find_controller, match_count| {
+                match_count_label.set_label(&format!("{} matches", match_count));
+            }
+        ));
     }
 }

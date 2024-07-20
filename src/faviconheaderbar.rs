@@ -30,7 +30,7 @@ impl FaviconTitle {
             .spacing(0)
             .build();
         let favicon = Image::new();
-        favicon.style_context().add_class("favicon");
+        favicon.add_css_class("favicon");
         favicon.set_halign(Align::End);
         favicon.set_hexpand(true);
         title_box.append(&favicon);
@@ -41,7 +41,7 @@ impl FaviconTitle {
             .width_chars(MIN_TITLE_CHARS)
             .halign(Align::Start)
             .build();
-        title.style_context().add_class("title");
+        title.add_css_class("title");
         title.set_hexpand(true);
         title_box.append(&title);
         label_box.append(&title_box);
@@ -52,7 +52,7 @@ impl FaviconTitle {
             .ellipsize(EllipsizeMode::End)
             .selectable(true)
             .build();
-        subtitle.style_context().add_class("subtitle");
+        subtitle.add_css_class("subtitle");
         let subtitle_box = gtk::Box::new(Orientation::Horizontal, 0);
         subtitle.set_hexpand(true);
         subtitle_box.append(&subtitle);

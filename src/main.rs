@@ -20,27 +20,39 @@ fn main() {
     app.connect_startup(|_app| {
         let display = gdk::Display::default().expect("can't get display");
         let provider = gtk::CssProvider::new();
-        provider.load_from_data(include_str!("css/style.css"));
+        provider.load_from_string(include_str!("css/style.css"));
         gtk::style_context_add_provider_for_display(
             &display,
             &provider,
             gtk::STYLE_PROVIDER_PRIORITY_USER,
         );
     });
-    app.connect_open(clone!(@strong settings => move |app, files, _hints| {
-        for f in files {
-            let win = window::Window::new(&app, settings.clone());
-            win.widget.show();
-            win.load_uri(&f.uri());
+    app.connect_open(clone!(
+        #[strong]
+        settings,
+        move |app, files, _hints| {
+            for f in files {
+                let win = window::Window::new(&app, settings.clone());
+                win.widget.present();
+                win.load_uri(&f.uri());
+            }
         }
-    }));
-    app.connect_activate(clone!(@strong settings => move |app| {
-        let win = window::Window::new(&app, settings.clone());
-        win.widget.show();
-        win.load_uri("about:blank");
-    }));
-    app.connect_shutdown(clone!(@strong settings => move |_app| {
-        settings::save_settings(&settings.borrow());
-    }));
+    ));
+    app.connect_activate(clone!(
+        #[strong]
+        settings,
+        move |app| {
+            let win = window::Window::new(&app, settings.clone());
+            win.widget.present();
+            win.load_uri("about:blank");
+        }
+    ));
+    app.connect_shutdown(clone!(
+        #[strong]
+        settings,
+        move |_app| {
+            settings::save_settings(&settings.borrow());
+        }
+    ));
     app.run();
 }
