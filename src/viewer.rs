@@ -30,9 +30,9 @@ impl Viewer {
         overlay.set_vexpand(true);
         box_.prepend(&overlay);
 
-        let mut builder = glib::object::Object::builder();
+        let mut builder = WebView::builder();
         if let Some(related_view) = related_view {
-            builder = builder.property("related-view", related_view);
+            builder = builder.related_view(related_view);
         } else {
             let network_session = NetworkSession::new_ephemeral();
             network_session
@@ -44,7 +44,7 @@ impl Viewer {
                 website_data_manager.set_favicons_enabled(true);
             }
 
-            builder = builder.property("network-session", network_session);
+            builder = builder.network_session(&network_session);
         }
         let webview = builder.build();
         WebViewExt::settings(&webview)
