@@ -260,12 +260,8 @@ impl Window {
             #[strong(rename_to = header)]
             self.header,
             move |webview| {
-                if let Some(surface) = webview.favicon() {
-                    if let Some(pixbuf) = gtk::gdk::pixbuf_get_from_texture(&surface) {
-                        header.set_favicon(Some(&pixbuf));
-                    } else {
-                        header.set_favicon(None);
-                    }
+                if let Some(favicon) = webview.favicon() {
+                    header.set_favicon(Some(&favicon));
                 } else {
                     header.set_favicon(None);
                 }

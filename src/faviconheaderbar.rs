@@ -1,6 +1,5 @@
 use gtk4 as gtk;
 
-use gtk::gdk_pixbuf::{InterpType, Pixbuf};
 use gtk::pango::EllipsizeMode;
 use gtk::prelude::*;
 
@@ -15,7 +14,6 @@ struct FaviconTitle {
 }
 
 const MIN_TITLE_CHARS: i32 = 6;
-const FAVICON_SIZE: i32 = 16;
 
 impl FaviconTitle {
     fn new() -> Self {
@@ -102,21 +100,11 @@ impl FaviconHeaderBar {
         self.favicontitle.subtitle.set_label(label);
     }
 
-    pub fn set_favicon(&self, favicon: Option<&Pixbuf>) {
+    pub fn set_favicon(&self, favicon: Option<&gtk::gdk::Texture>) {
         let favicontitle = &self.favicontitle;
 
         if let Some(favicon) = favicon {
-            let scale = favicontitle.favicon.scale_factor();
-            let favicon_size = FAVICON_SIZE * scale;
-
-            if favicon_size != favicon.width() || favicon_size != favicon.height() {
-                let favicon = &favicon
-                    .scale_simple(favicon_size, favicon_size, InterpType::Bilinear)
-                    .unwrap();
-                favicontitle.favicon.set_from_pixbuf(Some(favicon));
-            } else {
-                favicontitle.favicon.set_from_pixbuf(Some(favicon));
-            }
+            favicontitle.favicon.set_paintable(Some(favicon));
         } else {
             favicontitle.favicon.clear();
         }
