@@ -10,12 +10,13 @@ use gtk::glib::{clone, ControlFlow, GString};
 use gtk::{gio, glib};
 use gtk::{
     gio::{File, SimpleAction},
-    Align, Application, ApplicationWindow, Button, Image, Label, MenuButton, Orientation, Popover,
+    Align, Application, ApplicationWindow, Button, HeaderBar, Image, Label, MenuButton,
+    Orientation, Popover,
 };
 use webkit6::prelude::*;
 use webkit6::{ContextMenu, ContextMenuItem, NavigationType, WebView};
 
-use crate::faviconheaderbar;
+use crate::favicontitle;
 use crate::settings::Settings;
 use crate::viewer;
 
@@ -23,7 +24,7 @@ pub struct Window {
     pub widget: ApplicationWindow,
     application: Application,
     pub settings: Rc<RefCell<Settings>>,
-    header: Rc<faviconheaderbar::FaviconHeaderBar>,
+    favicontitle: favicontitle::FaviconTitle,
     back_button: Button,
     forward_button: Button,
     reload_or_stop_button: Button,
@@ -46,9 +47,10 @@ impl Window {
         let viewer = viewer::Viewer::new(related_view);
         win.set_child(Some(&viewer.widget));
 
-        let header = Rc::new(faviconheaderbar::FaviconHeaderBar::new());
-        header.widget.set_show_title_buttons(true);
-        win.set_titlebar(Some(&header.widget));
+        let favicontitle = favicontitle::FaviconTitle::new();
+        let header = HeaderBar::builder().title_widget(&favicontitle).build();
+        header.set_show_title_buttons(true);
+        win.set_titlebar(Some(&header));
 
         let navigation_buttons = gtk::Box::new(Orientation::Horizontal, 0);
         navigation_buttons.add_css_class("linked");
@@ -63,16 +65,16 @@ impl Window {
         forward_button.set_tooltip_text(Some("go forward"));
         navigation_buttons.append(&forward_button);
 
-        header.widget.pack_start(&navigation_buttons);
+        header.pack_start(&navigation_buttons);
 
         let reload_or_stop_button = Button::from_icon_name("view-refresh-symbolic");
         reload_or_stop_button.set_tooltip_text(Some("reload"));
-        header.widget.pack_start(&reload_or_stop_button);
+        header.pack_start(&reload_or_stop_button);
 
         let menu_button = MenuButton::new();
         menu_button.set_icon_name("document-send-symbolic");
         menu_button.set_tooltip_text(Some("re-open page with ..."));
-        header.widget.pack_end(&menu_button);
+        header.pack_end(&menu_button);
 
         let menu_popover = Popover::new();
         menu_button.set_popover(Some(&menu_popover));
@@ -132,7 +134,7 @@ impl Window {
             widget: win,
             application: app.clone(),
             settings,
-            header,
+            favicontitle,
             back_button,
             forward_button,
             reload_or_stop_button,
@@ -233,37 +235,37 @@ impl Window {
         ));
 
         self.viewer.webview.connect_title_notify(glib::clone!(
-            #[strong(rename_to = header)]
-            self.header,
+            #[weak(rename_to = favicontitle)]
+            self.favicontitle,
             move |webview| {
                 if let Some(title) = webview.title() {
-                    header.set_title(Some(&title));
+                    favicontitle.set_title(Some(&title));
                 } else {
-                    header.set_title(None);
+                    favicontitle.set_title(None);
                 }
             }
         ));
 
         self.viewer.webview.connect_uri_notify(glib::clone!(
-            #[strong(rename_to = header)]
-            self.header,
+            #[weak(rename_to = favicontitle)]
+            self.favicontitle,
             move |webview| {
                 if let Some(uri) = webview.uri() {
-                    header.set_subtitle(Some(uri.as_str()));
+                    favicontitle.set_subtitle(Some(uri.as_str()));
                 } else {
-                    header.set_subtitle(None);
+                    favicontitle.set_subtitle(None);
                 }
             }
         ));
 
         self.viewer.webview.connect_favicon_notify(glib::clone!(
-            #[strong(rename_to = header)]
-            self.header,
+            #[weak(rename_to = favicontitle)]
+            self.favicontitle,
             move |webview| {
                 if let Some(favicon) = webview.favicon() {
-                    header.set_favicon(Some(&favicon));
+                    favicontitle.set_favicon(Some(&favicon));
                 } else {
-                    header.set_favicon(None);
+                    favicontitle.set_favicon(None);
                 }
             }
         ));
@@ -308,10 +310,12 @@ impl Window {
             ));
 
         self.viewer.webview.connect_create(glib::clone!(
-            #[strong(rename_to = app)]
+            #[weak(rename_to = app)]
             self.application,
             #[strong(rename_to = settings)]
             self.settings,
+            #[upgrade_or]
+            glib::object::Object::builder().build(),
             move |webview, navigation_action| {
                 // XXX: why navigation_action.navigation_type() require &mut?
                 let mut navigation_action = navigation_action.clone();
@@ -492,10 +496,10 @@ impl Window {
 
         let selecturl_action = SimpleAction::new("select-url", None);
         selecturl_action.connect_activate(glib::clone!(
-            #[weak(rename_to = header)]
-            self.header,
+            #[weak(rename_to = favicontitle)]
+            self.favicontitle,
             move |_action, _parameter| {
-                header.select_subtitle();
+                favicontitle.select_subtitle();
             }
         ));
         self.widget.add_action(&selecturl_action);
