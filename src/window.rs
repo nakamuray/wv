@@ -3,10 +3,9 @@ use gtk4 as gtk;
 use gtk::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Duration;
 
 use gtk::gio::AppInfo;
-use gtk::glib::{clone, ControlFlow, GString};
+use gtk::glib::{clone, GString};
 use gtk::{gdk, gio, glib};
 use gtk::{
     gio::{File, SimpleAction},
@@ -398,34 +397,37 @@ impl Window {
             }
         ));
 
-        // XXX: until BackForwardListExt::connect_changed is implemented,
-        // poll to check we can go back/forward
-        glib::timeout_add_local(
-            Duration::from_secs(1),
-            glib::clone!(
-                #[weak(rename_to = webview)]
-                self.viewer.webview,
-                #[weak(rename_to = back_button)]
-                self.back_button,
-                #[weak(rename_to = forward_button)]
-                self.forward_button,
-                #[upgrade_or]
-                ControlFlow::Break,
-                move || {
-                    if webview.can_go_back() {
-                        back_button.set_sensitive(true);
-                    } else {
-                        back_button.set_sensitive(false);
+        self.viewer
+            .webview
+            .back_forward_list()
+            .unwrap()
+            .connect_local(
+                "changed",
+                false,
+                glib::clone!(
+                    #[weak(rename_to = webview)]
+                    self.viewer.webview,
+                    #[weak(rename_to = back_button)]
+                    self.back_button,
+                    #[weak(rename_to = forward_button)]
+                    self.forward_button,
+                    #[upgrade_or]
+                    None,
+                    move |_args| {
+                        if webview.can_go_back() {
+                            back_button.set_sensitive(true);
+                        } else {
+                            back_button.set_sensitive(false);
+                        }
+                        if webview.can_go_forward() {
+                            forward_button.set_sensitive(true);
+                        } else {
+                            forward_button.set_sensitive(false);
+                        }
+                        None
                     }
-                    if webview.can_go_forward() {
-                        forward_button.set_sensitive(true);
-                    } else {
-                        forward_button.set_sensitive(false);
-                    }
-                    ControlFlow::Continue
-                }
-            ),
-        );
+                ),
+            );
 
         self.back_button.connect_clicked(glib::clone!(
             #[weak(rename_to = webview)]
