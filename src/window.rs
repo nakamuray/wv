@@ -7,14 +7,17 @@ use std::time::Duration;
 
 use gtk::gio::AppInfo;
 use gtk::glib::{clone, ControlFlow, GString};
-use gtk::{gio, glib};
+use gtk::{gdk, gio, glib};
 use gtk::{
     gio::{File, SimpleAction},
     Align, Application, ApplicationWindow, Button, HeaderBar, Image, Label, MenuButton,
     Orientation, Popover,
 };
 use webkit6::prelude::*;
-use webkit6::{ContextMenu, ContextMenuItem, NavigationType, WebView};
+use webkit6::{
+    ContextMenu, ContextMenuItem, NavigationPolicyDecision, NavigationType, PolicyDecisionType,
+    WebView,
+};
 
 use crate::favicontitle;
 use crate::settings::Settings;
@@ -336,6 +339,62 @@ impl Window {
                     }
                 }
                 webview.clone().into()
+            }
+        ));
+        self.viewer.webview.connect_decide_policy(glib::clone!(
+            #[weak(rename_to = app)]
+            self.application,
+            #[strong(rename_to = settings)]
+            self.settings,
+            #[upgrade_or]
+            false,
+            move |webview, decision, decision_type| {
+                match decision_type {
+                    PolicyDecisionType::NavigationAction | PolicyDecisionType::NewWindowAction => {
+                        ()
+                    }
+                    _ => return false,
+                }
+
+                let navigation_decision: &NavigationPolicyDecision =
+                    decision.downcast_ref().unwrap();
+                let mut action = navigation_decision.navigation_action().unwrap();
+
+                let button = action.mouse_button();
+                let state = action.modifiers();
+                if (action.is_user_gesture()
+                    || action.navigation_type() == NavigationType::LinkClicked)
+                    && (button == gdk::BUTTON_MIDDLE
+                        || state == gdk::ModifierType::SHIFT_MASK.bits()
+                        || state == gdk::ModifierType::CONTROL_MASK.bits())
+                {
+                    let request = action.request().unwrap();
+                    if let Some(uri) = request.uri() {
+                        // open link in new window
+                        let win = Window::new(&app, settings.clone(), Some(&webview));
+                        win.widget.present();
+                        win.load_uri(&uri);
+                        decision.ignore();
+                        return true;
+                    }
+                }
+
+                if decision_type == PolicyDecisionType::NewWindowAction {
+                    if action.is_user_gesture()
+                        || action.navigation_type() == NavigationType::LinkClicked
+                    {
+                        let request = action.request().unwrap();
+                        // open link in this window, not new window
+                        webview.load_request(&request);
+                        decision.ignore();
+                        return true;
+                    } else {
+                        // ignore automatically opened new window
+                        decision.ignore();
+                        return true;
+                    }
+                }
+                false
             }
         ));
 

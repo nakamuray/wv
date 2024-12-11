@@ -7,10 +7,7 @@ use gtk::glib::clone;
 
 use gtk::{Align, Label, Orientation, Overlay, ProgressBar, SearchBar, SearchEntry};
 use webkit6::prelude::*;
-use webkit6::{
-    CookieAcceptPolicy, FindOptions, NavigationPolicyDecision, NetworkSession, PolicyDecisionType,
-    WebView,
-};
+use webkit6::{CookieAcceptPolicy, FindOptions, NetworkSession, WebView};
 
 pub struct Viewer {
     pub widget: gtk::Box,
@@ -134,22 +131,6 @@ impl Viewer {
                 }
             }
         ));
-
-        self.webview
-            .connect_decide_policy(|webview, decision, decision_type| {
-                match decision_type {
-                    PolicyDecisionType::NewWindowAction => {
-                        let navigation_decision: &NavigationPolicyDecision =
-                            decision.downcast_ref().unwrap();
-                        let mut action = navigation_decision.navigation_action().unwrap();
-                        let request = action.request().unwrap();
-                        // open link in this window, not new window
-                        webview.load_request(&request);
-                        true
-                    }
-                    _ => false,
-                }
-            });
 
         let find_controller = self.webview.find_controller().unwrap();
         self.search_entry.connect_activate(glib::clone!(
