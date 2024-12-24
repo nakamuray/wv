@@ -17,12 +17,15 @@ pub struct Viewer {
     pub search_bar: SearchBar,
     search_entry: SearchEntry,
     match_count_label: Label,
+    alert_revealer: gtk::Revealer,
+    alert_label: Label,
 }
 
 impl Viewer {
     pub fn new(related_view: Option<&WebView>) -> Self {
         let box_ = gtk::Box::new(Orientation::Vertical, 0);
         box_.set_homogeneous(false);
+
         let overlay = Overlay::new();
         overlay.set_vexpand(true);
         box_.prepend(&overlay);
@@ -67,6 +70,17 @@ impl Viewer {
         status_bar.set_visible(false);
         overlay.add_overlay(&status_bar);
 
+        let alert_label = Label::builder()
+            .css_classes(["alert"])
+            .hexpand(true)
+            .justify(gtk::Justification::Center)
+            .build();
+        let alert_revealer = gtk::Revealer::builder()
+            .hexpand(true)
+            .child(&alert_label)
+            .build();
+        box_.prepend(&alert_revealer);
+
         let search_bar = SearchBar::new();
         search_bar.set_show_close_button(true);
         box_.append(&search_bar);
@@ -92,6 +106,8 @@ impl Viewer {
             search_bar,
             search_entry,
             match_count_label,
+            alert_revealer,
+            alert_label,
         };
         this.setup_callbacks();
         this
@@ -172,6 +188,24 @@ impl Viewer {
             self.match_count_label,
             move |_find_controller, match_count| {
                 match_count_label.set_label(&format!("{} matches", match_count));
+            }
+        ));
+
+        self.webview.connect_web_process_terminated(glib::clone!(
+            #[weak(rename_to = alert_revealer)]
+            self.alert_revealer,
+            #[weak(rename_to = alert_label)]
+            self.alert_label,
+            move |_webview, reason| {
+                alert_label.set_label(&format!("web process terminated: {:?}", reason));
+                alert_revealer.set_reveal_child(true);
+            }
+        ));
+        self.webview.connect_load_changed(glib::clone!(
+            #[weak(rename_to = alert_revealer)]
+            self.alert_revealer,
+            move |_webview, _event| {
+                alert_revealer.set_reveal_child(false);
             }
         ));
     }

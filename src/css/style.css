@@ -7,6 +7,13 @@ label.status-bar {
     border-radius: 0 8px 0 0;
 }
 
+label.alert {
+    font-weight: bold;
+    color: #e01b24;
+    background-color: color-mix(in srgb, currentColor 15%, transparent);
+    padding: 6px;
+}
+
 button.menuitem {
     padding-top: 1px;
     padding-bottom: 1px;
