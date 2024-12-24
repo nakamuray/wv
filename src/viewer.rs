@@ -161,12 +161,12 @@ impl Viewer {
                     _ => {
                         find_controller.count_matches(
                             &search_text,
-                            (FindOptions::WRAP_AROUND & FindOptions::CASE_INSENSITIVE).bits(),
+                            (FindOptions::WRAP_AROUND | FindOptions::CASE_INSENSITIVE).bits(),
                             std::u32::MAX,
                         );
                         find_controller.search(
                             &search_text,
-                            (FindOptions::WRAP_AROUND & FindOptions::CASE_INSENSITIVE).bits(),
+                            (FindOptions::WRAP_AROUND | FindOptions::CASE_INSENSITIVE).bits(),
                             std::u32::MAX,
                         );
                     }
