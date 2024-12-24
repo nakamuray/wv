@@ -47,9 +47,9 @@ impl Viewer {
             builder = builder.network_session(&network_session);
         }
         let webview = builder.build();
-        WebViewExt::settings(&webview)
-            .unwrap()
-            .set_enable_smooth_scrolling(true);
+        let settings = WebViewExt::settings(&webview).unwrap();
+        settings.set_enable_smooth_scrolling(true);
+        settings.set_enable_back_forward_navigation_gestures(true);
         overlay.set_child(Some(&webview));
 
         let progress_bar = ProgressBar::builder()
