@@ -17,6 +17,7 @@ fn main() {
     let settings = Rc::new(RefCell::new(settings::load_settings()));
 
     let app = Application::new(Some("org.u7fa9.wv"), gio::ApplicationFlags::HANDLES_OPEN);
+    app.set_option_context_parameter_string(Some("[URL]"));
     app.connect_startup(|_app| {
         let display = gdk::Display::default().expect("can't get display");
         let provider = gtk::CssProvider::new();
