@@ -10,3 +10,4 @@ Icon=web-browser-symbolic
 Terminal=false
 MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
 Categories=Network;WebBrowser;
+StartupWMClass=org.u7fa9.wv
