@@ -47,7 +47,7 @@ impl Window {
         );
 
         let viewer = viewer::Viewer::new(related_view);
-        win.set_child(Some(&viewer.widget));
+        win.set_child(Some(&viewer));
 
         let favicontitle = favicontitle::FaviconTitle::new();
         let header = HeaderBar::builder().title_widget(&favicontitle).build();
@@ -117,12 +117,12 @@ impl Window {
             button.connect_clicked(clone!(
                 #[strong]
                 info,
-                #[weak(rename_to = webview)]
-                viewer.webview,
+                #[weak]
+                viewer,
                 #[weak]
                 menu_popover,
                 move |_button| {
-                    if let Some(uri) = webview.uri() {
+                    if let Some(uri) = viewer.webview().uri() {
                         if let Err(e) = info.launch_uris(&[&uri], gio::AppLaunchContext::NONE) {
                             eprintln!("{:?}", e);
                         }
@@ -169,7 +169,7 @@ impl Window {
         ));
 
         self.viewer
-            .webview
+            .webview()
             .connect_context_menu(|_webview, context_menu, hit_test_result| {
                 if hit_test_result.context_is_link() {
                     let uri = hit_test_result.link_uri().unwrap().to_string();
@@ -207,7 +207,7 @@ impl Window {
                 false
             });
 
-        self.viewer.webview.connect_load_changed(glib::clone!(
+        self.viewer.webview().connect_load_changed(glib::clone!(
             #[weak(rename_to = back_button)]
             self.back_button,
             #[weak(rename_to = forward_button)]
@@ -236,7 +236,7 @@ impl Window {
             }
         ));
 
-        self.viewer.webview.connect_title_notify(glib::clone!(
+        self.viewer.webview().connect_title_notify(glib::clone!(
             #[weak(rename_to = favicontitle)]
             self.favicontitle,
             move |webview| {
@@ -248,7 +248,7 @@ impl Window {
             }
         ));
 
-        self.viewer.webview.connect_uri_notify(glib::clone!(
+        self.viewer.webview().connect_uri_notify(glib::clone!(
             #[weak(rename_to = favicontitle)]
             self.favicontitle,
             move |webview| {
@@ -260,7 +260,7 @@ impl Window {
             }
         ));
 
-        self.viewer.webview.connect_favicon_notify(glib::clone!(
+        self.viewer.webview().connect_favicon_notify(glib::clone!(
             #[weak(rename_to = favicontitle)]
             self.favicontitle,
             move |webview| {
@@ -273,7 +273,7 @@ impl Window {
         ));
 
         self.viewer
-            .webview
+            .webview()
             .network_session()
             .unwrap()
             .connect_download_started(glib::clone!(
@@ -311,7 +311,7 @@ impl Window {
                 }
             ));
 
-        self.viewer.webview.connect_create(glib::clone!(
+        self.viewer.webview().connect_create(glib::clone!(
             #[weak(rename_to = app)]
             self.application,
             #[strong(rename_to = settings)]
@@ -326,21 +326,21 @@ impl Window {
                         if let Some(_uri) = req.uri() {
                             // action from "Open Link in New Window" context menu (maybe)
                             let win = Window::new(&app, settings.clone(), Some(&webview));
-                            win.viewer.webview.connect_ready_to_show(glib::clone!(
+                            win.viewer.webview().connect_ready_to_show(glib::clone!(
                                 #[weak(rename_to = window)]
                                 win.widget,
                                 move |_webview| {
                                     window.present();
                                 }
                             ));
-                            return win.viewer.webview.into();
+                            return win.viewer.webview().into();
                         }
                     }
                 }
                 webview.clone().into()
             }
         ));
-        self.viewer.webview.connect_decide_policy(glib::clone!(
+        self.viewer.webview().connect_decide_policy(glib::clone!(
             #[weak(rename_to = app)]
             self.application,
             #[strong(rename_to = settings)]
@@ -398,7 +398,7 @@ impl Window {
         ));
 
         self.viewer
-            .webview
+            .webview()
             .back_forward_list()
             .unwrap()
             .connect_local(
@@ -406,7 +406,7 @@ impl Window {
                 false,
                 glib::clone!(
                     #[weak(rename_to = webview)]
-                    self.viewer.webview,
+                    self.viewer.webview(),
                     #[weak(rename_to = back_button)]
                     self.back_button,
                     #[weak(rename_to = forward_button)]
@@ -431,7 +431,7 @@ impl Window {
 
         self.back_button.connect_clicked(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             move |_button| {
                 webview.go_back();
                 webview.grab_focus();
@@ -442,7 +442,7 @@ impl Window {
         back_button_right_pressed.set_button(3);
         back_button_right_pressed.connect_pressed(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             #[weak(rename_to = back_button)]
             self.back_button,
             move |_gesture, _n, _x, _y| {
@@ -456,7 +456,7 @@ impl Window {
 
         self.forward_button.connect_clicked(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             move |_button| {
                 webview.go_forward();
                 webview.grab_focus();
@@ -467,7 +467,7 @@ impl Window {
         forward_button_right_pressed.set_button(3);
         forward_button_right_pressed.connect_pressed(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             #[weak(rename_to = forward_button)]
             self.forward_button,
             move |_gesture, _n, _x, _y| {
@@ -481,7 +481,7 @@ impl Window {
             .add_controller(forward_button_right_pressed);
         self.reload_or_stop_button.connect_clicked(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             move |_button| {
                 if webview.is_loading() {
                     webview.stop_loading();
@@ -508,7 +508,7 @@ impl Window {
         let find_action = SimpleAction::new("find", None);
         find_action.connect_activate(glib::clone!(
             #[weak(rename_to = search_bar)]
-            self.viewer.search_bar,
+            self.viewer.search_bar(),
             move |_action, _parameter| {
                 if !search_bar.is_search_mode() {
                     search_bar.set_search_mode(true);
@@ -522,7 +522,7 @@ impl Window {
         let back_action = SimpleAction::new("back", None);
         back_action.connect_activate(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             move |_action, _parameter| {
                 webview.go_back();
             }
@@ -534,7 +534,7 @@ impl Window {
         let forward_action = SimpleAction::new("forward", None);
         forward_action.connect_activate(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             move |_action, _parameter| {
                 webview.go_forward();
             }
@@ -546,7 +546,7 @@ impl Window {
         let reload_action = SimpleAction::new("reload", None);
         reload_action.connect_activate(glib::clone!(
             #[weak(rename_to = webview)]
-            self.viewer.webview,
+            self.viewer.webview(),
             move |_action, _parameter| {
                 webview.reload();
             }
@@ -568,7 +568,7 @@ impl Window {
             .set_accels_for_action("win.select-url", &["<Primary>l"]);
     }
     pub fn load_uri(&self, uri: &str) {
-        self.viewer.webview.load_uri(uri)
+        self.viewer.webview().load_uri(uri)
     }
 }
 
