@@ -201,6 +201,30 @@ mod imp {
                     }
                 }
             ));
+            self.search_entry.connect_search_changed(glib::clone!(
+                #[weak]
+                find_controller,
+                #[weak(rename_to = this)]
+                self,
+                move |search_entry| {
+                    let search_text = search_entry.text();
+                    if search_text.is_empty() {
+                        this.match_count_label.set_label("");
+                        find_controller.search_finish();
+                    } else {
+                        find_controller.count_matches(
+                            &search_text,
+                            (FindOptions::WRAP_AROUND | FindOptions::CASE_INSENSITIVE).bits(),
+                            std::u32::MAX,
+                        );
+                        find_controller.search(
+                            &search_text,
+                            (FindOptions::WRAP_AROUND | FindOptions::CASE_INSENSITIVE).bits(),
+                            std::u32::MAX,
+                        );
+                    }
+                }
+            ));
             self.search_entry.connect_stop_search(glib::clone!(
                 #[weak]
                 find_controller,
