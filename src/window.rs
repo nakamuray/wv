@@ -151,19 +151,15 @@ impl Window {
             #[strong(rename_to = settings)]
             self.settings,
             move |win| {
-                let height = win.size(Orientation::Vertical);
-                let width = win.size(Orientation::Horizontal);
+                let height = win.default_height();
                 (*settings.borrow_mut()).window.height = height;
-                (*settings.borrow_mut()).window.width = width;
             }
         ));
         self.widget.connect_default_width_notify(glib::clone!(
             #[strong(rename_to = settings)]
             self.settings,
             move |win| {
-                let height = win.size(Orientation::Vertical);
-                let width = win.size(Orientation::Horizontal);
-                (*settings.borrow_mut()).window.height = height;
+                let width = win.default_width();
                 (*settings.borrow_mut()).window.width = width;
             }
         ));
