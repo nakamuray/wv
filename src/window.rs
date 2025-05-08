@@ -123,7 +123,8 @@ impl Window {
                 menu_popover,
                 move |_button| {
                     if let Some(uri) = viewer.webview().uri() {
-                        if let Err(e) = info.launch_uris(&[&uri], gio::AppLaunchContext::NONE) {
+                        let context = gdk::Display::default().map(|d| d.app_launch_context());
+                        if let Err(e) = info.launch_uris(&[&uri], context.as_ref()) {
                             eprintln!("{:?}", e);
                         }
                     }
@@ -186,9 +187,9 @@ impl Window {
                             #[strong]
                             uri,
                             move |_action, _parameter| {
-                                if let Err(e) =
-                                    info.launch_uris(&[&uri], gio::AppLaunchContext::NONE)
-                                {
+                                let context =
+                                    gdk::Display::default().map(|d| d.app_launch_context());
+                                if let Err(e) = info.launch_uris(&[&uri], context.as_ref()) {
                                     eprintln!("{:?}", e);
                                 }
                             }
